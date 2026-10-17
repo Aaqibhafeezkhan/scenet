@@ -40,6 +40,12 @@ jobs:
         # entirely -- it surfaced first in the browser, where Pyodide ran an older
         # Python. This job is what stops it coming back.
         python: ["3.12", "3.14"]
+    # Every uv command in the job, not only the sync. Left to itself, `uv run` reads
+    # .python-version (3.14), finds the 3.12 environment the sync made, and replaces it
+    # with a 3.14 one holding the default groups only -- so this job ran its tests on
+    # 3.14 and the floor went untested.
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,6 +121,12 @@ jobs:
       # than quietly producing a worse site.
       - name: Build the documentation
         run: uv run sphinx-build -W --keep-going -b html docs docs/_build/html
+
+      # Every page must say which version it documents, where the one switcher.json is,
+      # and its canonical address at the root: the version switcher, the warning banner
+      # and search engines rest on them, and a build missing them looks fine on its own.
+      - name: Check the documentation says its version
+        run: uv run python scripts/site_versions.py check docs/_build/html
 
   licenses:
     name: Dependency licenses
