@@ -3,8 +3,9 @@
 Recipes for specific jobs. Each one assumes you already know roughly what Scenet is; if
 you do not, the [tutorial](../tutorial/index) is the place to start.
 
-Every Python code block here is executed by the test suite, so examples cannot quietly
-lose an import or drift. Workflow examples are illustrative; the suite does not run them.
+Every Python and bash code block here is executed by the test suite, so examples cannot
+quietly lose an import or drift. Workflow examples are illustrative; the suite does not
+run them.
 
 ```{toctree}
 :maxdepth: 1
