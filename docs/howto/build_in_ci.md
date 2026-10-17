@@ -51,7 +51,7 @@ jobs:
         if: always() && steps.install.outcome == 'success'
         run: |
           mkdir -p dist
-          scenet build comics/issue-01.scene.yaml -o dist/issue-01.svg
+          scenet build comics/issue-01.scene.yaml -o dist/
 
       - name: Upload SVG artifact
         if: always() && steps.build.outcome != 'skipped'
@@ -72,6 +72,9 @@ steps have run. The upload runs with `if: always()`; it is skipped for pull requ
 from forks because their token cannot write code-scanning results. The SVGs are available
 from the workflow run's **Artifacts** section.
 
+Each finding includes a stable `ruleId` and fingerprint, allowing code scanning to track
+alerts across runs.
+
 ## Code scanning availability
 
 Code scanning is free for public repositories. Private and internal repositories need
@@ -79,7 +82,7 @@ Code scanning is free for public repositories. Private and internal repositories
 The workflow grants `security-events: write`, which the SARIF upload requires.
 
 If Code Security is not available, use `--format text` instead. It prints one
-`file:line:column: rule: message` finding per line; a [GitHub Actions problem matcher](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows/adding-a-problem-matcher)
+`file:line:column: rule: message` finding per line; a [GitHub Actions problem matcher](https://github.com/actions/toolkit/blob/main/docs/problem-matchers.md)
 can turn those lines into annotations. Save this as
 `.github/scenet-problem-matcher.json`:
 
@@ -87,10 +90,24 @@ can turn those lines into annotations. Save this as
 {
   "problemMatcher": [
     {
+      "owner": "scenet-note",
+      "severity": "warning",
+      "pattern": [
+        {
+          "regexp": "^(.*):(\\d+):(\\d+): note: ([^:]+): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "code": 4,
+          "message": 5
+        }
+      ]
+    },
+    {
       "owner": "scenet",
       "pattern": [
         {
-          "regexp": "^(.*):(\\d+):(\\d+): ([^:]+): (.*)$",
+          "regexp": "^(.*):(\\d+):(\\d+): (?!note: )([^:]+): (.*)$",
           "file": 1,
           "line": 2,
           "column": 3,
@@ -102,6 +119,9 @@ can turn those lines into annotations. Save this as
   ]
 }
 ```
+
+The first matcher reports `note` diagnostics as warnings; the second handles other
+findings without interpreting `note` as a rule name.
 
 Replace the SARIF check and upload steps with these steps; keep the final failure step
 above unchanged:
@@ -124,5 +144,5 @@ open `scenet.sarif` with Microsoft's [SARIF Viewer for VS Code](https://github.c
 Pin the package version in CI: releases below `1.0.0` may make breaking changes in a
 minor release. Update the pin deliberately when upgrading.
 
-*Last checked with Scenet 0.10.0. The documentation test suite runs Python examples,
+*Last checked with Scenet 0.10.0. The documentation test suite runs Python and bash examples,
 but does not execute this GitHub Actions workflow.*
