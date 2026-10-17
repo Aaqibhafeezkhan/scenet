@@ -28,7 +28,8 @@ nowhere to put them, and unknown keys are rejected.
    language; see the `language` part.
 2. **Comic script** — `*.script`. The format comic writers already use: `PANEL 1`,
    `@shot:`, a character cue, the dialogue under it, with a short YAML front matter
-   declaring the cast. See the `comic-script` part.
+   declaring the cast. Dark Horse's published layout is read as written, and so are
+   French scripts; each PAGE heading is a page. See the `comic-script` part.
 
 **If you cannot run code** — a chat app, NotebookLM — write a comic script. It is the
 closest thing to what you would write anyway, and the person you are helping compiles
@@ -70,7 +71,7 @@ so always check.
 - `preamble` — Start here: what Scenet is, the two ways to write a panel, the check-and-fix loop, and the mistakes generators make most
 - `language` — The language reference: every block and key of a panel or scene document
 - `shot-types` — Normative: what each camera shot frames, in head-heights
-- `comic-script` — The comic-script format: PANEL 1, @shot:, character cues, dialogue
+- `comic-script` — The comic-script format: PAGE and PANEL headings as Dark Horse writes them, @shot:, cues, captions, off-panel speech, pages, and French scripts
 - `characters` — The shipped puppets, with every pose and expression each declares
 - `diagnostics` — Every rule `scenet check` reports, and what to do about each
 - `schema` — The JSON Schema for a single-panel YAML document
@@ -3806,4 +3807,54 @@ panels:
       - say: {by: bob, text: "Fine. Go back to sleep.", size: small}
       - say: {by: caller, text: "Then open the door.", off_panel: bottom}
       - say: {by: caller, text: "I know you're there.", off_panel: true}
+```
+
+## A French script: planche, cases, récitatif, pensée, hors champ, the échelle des plans
+
+`33-planche.script`
+
+```text
+---
+panel:
+  size: [900, 640]
+cast:
+  LÉA: {reference: alice, pose: pointing,     at: left_third}
+  TOM: {reference: bob,   pose: arms_crossed, at: right_third, facing: left}
+staging:
+  - LÉA left_of TOM
+  - LÉA looking_at TOM
+  - LÉA ground_shared_with TOM
+---
+Claire Aubert
+Le Phare, tome 1
+
+PLANCHE 1 (trois cases)
+@tiers: 2 1
+
+CASE 1 : La falaise, le soir. Léa arrive en haut des marches ; Tom l'attend près de la porte.
+@shot: plan d'ensemble
+@setting: {place: shore, time: dusk}
+
+RÉCITATIF : Port-Ellis, le soir où la lampe s'est éteinte.
+
+LÉA :
+« Tom ? La lampe est éteinte ! »
+
+GARDIEN (hors champ) :
+Qui est là-haut ?
+
+CASE 2 : Plus près. Tom hausse les épaules.
+@shot: plan américain
+@angle: contre-plongée
+
+TOM :
+« Quelqu'un a oublié l'huile. »
+
+CASE 3
+@shot: plan rapproché poitrine
+
+TOM (pensée)
+Ce n'était pas moi.
+
+ONOMATOPÉE : FLOP
 ```
