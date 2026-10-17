@@ -3,13 +3,15 @@
 Recipes for specific jobs. Each one assumes you already know roughly what Scenet is; if
 you do not, the [tutorial](../tutorial/index) is the place to start.
 
-Every code block here is executed by the test suite, so nothing is missing an import and
-nothing has drifted.
+Every Python and bash code block here is executed by the test suite, so examples cannot
+quietly lose an import or drift. Workflow examples are illustrative; the suite does not
+run them.
 
 ```{toctree}
 :maxdepth: 1
 
 install
+build_in_ci
 use_as_a_library
 compile_a_sequence
 compose_a_page
