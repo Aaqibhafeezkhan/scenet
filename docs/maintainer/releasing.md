@@ -75,13 +75,20 @@ push tag v0.2.0
       │
       ├─ extension npm ci → tsc → vsce package → scenet.vsix
       │
+      ├─ site      the documentation and the playground, running the wheel
+      │            `build` made → scenet-0.2.0-site.zip
+      │
       ├─ publish   ⏸ waits for you to approve the `pypi` environment
       │            → pypi.org, via Trusted Publishing, with attestations
       │
       ├─ release   → GitHub Release, notes from CHANGELOG,
-      │              sdist + wheel + vsix attached
+      │              sdist + wheel + vsix + site attached
       │
       └─ registry  → listed in the MCP registry, from the PyPI package
+
+then, once the run completes:
+
+      Pages        → the site's root serves the release; /vX.Y/ holds it too
 ```
 
 **For this repository, all of it is switched on**: PyPI publishing, the approval before it,
@@ -118,6 +125,89 @@ tags are protected against deletion.
 It is a real trade. Releases stop being synchronous, which matters when the person who
 tagged is not around to approve; and the gate protects against a mistake that cannot be
 undone. Decide once, deliberately, rather than discovering it mid-release.
+
+## The site attached to each release
+
+Every release carries its documentation site, built by the `site` job: the documentation,
+the playground running the very wheel PyPI gets, the JSON Schemas, the spec pack and
+`llms.txt`, as `scenet-X.Y.Z-site.zip` on the GitHub Release. It is built before anything
+is published, so a documentation build that fails (`sphinx -W`) stops the release while
+nothing is out yet.
+
+That attachment is the one build of the release's site there will ever be. The
+documentation site serves every version from the attachments, so the site of a version is
+exactly what was released, whatever has changed since. Anyone can also download it to read
+offline; the playground in it needs a local web server, not `file://`.
+
+### What the site serves
+
+| Path | What |
+|---|---|
+| `/scenet/` | The latest release: documentation, playground, `schemas/`, `scenet-spec.md`, `llms.txt` |
+| `/scenet/dev/` | `main`, rebuilt on every push |
+| `/scenet/vX.Y/` | Each released minor version, its highest patch, from 0.8 |
+| `/scenet/switcher.json` | The version switcher's data, which every version reads |
+
+`pages.yml` builds `main`, downloads the site attached to each release, and assembles them
+(`scripts/build_site.py`). It runs on every push to `main`, which changes `/dev/` and
+nothing else, and when the release workflow completes, which moves the root to the new
+release. **Run it by hand** (**Actions → Pages → Run workflow**) after a backfill, or after
+deleting a release's site:
+
+```bash
+gh workflow run pages.yml
+```
+
+Some consequences worth knowing:
+
+- **A documentation fix merged to `main` appears under `/dev/` only.** The root changes when a
+  release does. To correct the documentation of a release people are using, cut a patch
+  release: `/vX.Y/` and the root then serve it.
+- **Only the three newest minor versions keep their playground**, besides the root and
+  `/dev/`. An older version keeps its documentation, schemas and spec pack, and its
+  `playground/` becomes a page pointing at the latest playground and at the full site on the
+  release. GitHub Pages caps a site at 1 GB; the assembly fails before it gets there.
+- **Every page names its counterpart at the root as canonical**, so search engines send
+  readers to the current documentation.
+
+To look at the site as it will deploy, build it and serve it locally — under `/scenet/`,
+as Pages does, which the version switcher needs:
+
+```bash
+uv run python scripts/build_site.py
+uv run python scripts/serve_site.py
+```
+
+That downloads the releases' sites with `gh`, so it must be signed in. With
+`--releases DIR` it takes them from a directory instead, such as the one `backfill_site.py`
+writes to.
+
+### Backfilling a release made before that
+
+Releases up to 0.11.0 were made before releases carried a site. **Actions → Site backfill
+→ Run workflow**, giving the tag, builds one and attaches it:
+
+```bash
+gh workflow run site-backfill.yml -f tag=v0.11.0
+```
+
+It builds the release's own sources with its own lockfiles, and its playground runs the
+wheel attached to that release. Only the files that make a build versioned
+(`backfill_site.py` lists them) are taken from `main` and laid over the release's. That is
+sound only where the release built its site with the same tooling as v0.11.0, which holds
+from **v0.8.0 to v0.11.0**; the script refuses any other tag. The documentation of v0.1.0
+to v0.7.0 is not on the site, and stays readable at its tag on GitHub.
+
+The workflow never replaces a site already attached. To rebuild one, delete the asset from
+the release first. The same build runs locally, without attaching anything:
+
+```bash
+uv run python scripts/backfill_site.py v0.11.0 --out build/backfill
+```
+
+**If immutable releases are ever enabled** for this repository, a published release can
+no longer gain an asset, and backfilling stops being possible. Releases made by the workflow
+are unaffected: their site is attached as they are created.
 
 ## Listing in the MCP registry
 

@@ -162,6 +162,203 @@ class TestThePackageIsCheckedOnEveryPullRequest:
         assert "id-token" not in str(job.get("permissions", {}))
 
 
+def test_the_python_floor_is_really_tested():
+    """`uv run` reads .python-version (3.14) and, finding a 3.12 environment, rebuilds it.
+
+    The 3.12 job synced 3.12, then ran its tests on 3.14 with the default groups only, so
+    the floor went untested. Every uv command in the job must name the matrix's Python.
+    """
+    job = _load("ci.yml")["jobs"]["check"]
+    assert job["env"]["UV_PYTHON"] == "${{ matrix.python }}"
+    script = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert "uv run pytest" in script
+
+
+def _script(job: dict[Any, Any]) -> str:
+    return "\n".join(str(step.get("run", "")) for step in job["steps"])
+
+
+def _downloads(job: dict[Any, Any]) -> list[str]:
+    return [
+        step["with"]["name"]
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("actions/download-artifact@")
+    ]
+
+
+#: Grants that publish something: a deployment, an OIDC token, a write to the repository.
+PUBLISHING = {"id-token", "pages", "contents", "packages", "attestations", "deployments"}
+#: Events a pull request -- possibly from a fork -- can set off.
+PULL_REQUEST_EVENTS = {"pull_request", "pull_request_target", "merge_group"}
+
+
+@pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.yml")), ids=lambda p: p.name)
+def test_no_pull_request_holds_a_publishing_credential(path: Path):
+    """A workflow a pull request sets off writes nothing and deploys nothing."""
+    workflow = _load(path.name)
+    if not PULL_REQUEST_EVENTS & set(_triggers(workflow)):
+        return
+    grants = [workflow.get("permissions") or {}]
+    for name, job in workflow["jobs"].items():
+        assert "environment" not in job, f"{path.name}: {name} deploys to an environment"
+        grants.append(job.get("permissions") or {})
+    for grant in grants:
+        assert isinstance(grant, dict), f"{path.name}: permissions must be listed one by one"
+        for scope, level in grant.items():
+            assert scope not in PUBLISHING or level != "write", f"{path.name}: {scope}: write"
+
+
+class TestTheReleaseBuildsItsSite:
+    """Pages serves every release from the site attached to it, built by the release."""
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def release(cls) -> dict[Any, Any]:
+        return _load("release.yml")
+
+    def test_it_is_built_from_the_wheel_the_release_publishes(self, release: dict[Any, Any]):
+        job = release["jobs"]["site"]
+        assert job["needs"] == "build"
+        assert _downloads(job) == ["distributions"]
+        assert "scripts/build_site.py --release-archive" in _script(job)
+
+    def test_it_publishes_nothing_itself(self, release: dict[Any, Any]):
+        job = release["jobs"]["site"]
+        assert "permissions" not in job
+        assert "environment" not in job
+        uploads = [s for s in job["steps"] if "upload-artifact@" in str(s.get("uses", ""))]
+        assert [step["with"]["name"] for step in uploads] == ["site"]
+
+    def test_pypi_waits_for_it(self, release: dict[Any, Any]):
+        """Everything that can fail runs before anything is published."""
+        assert "site" in release["jobs"]["publish"]["needs"]
+
+    def test_pypi_gets_the_distributions_only(self, release: dict[Any, Any]):
+        assert _downloads(release["jobs"]["publish"]) == ["distributions"]
+
+    def test_the_github_release_attaches_it(self, release: dict[Any, Any]):
+        job = release["jobs"]["github-release"]
+        assert "site" in job["needs"]
+        assert "needs.site.result == 'success'" in job["if"]
+        assert "site" in _downloads(job)
+
+    def test_the_notes_link_the_releases_own_documentation(self, release: dict[Any, Any]):
+        """The root moves on to the next release; the notes are forever."""
+        assert "creatoan.github.io/scenet/v${MINOR}/" in _script(release["jobs"]["github-release"])
+
+
+class TestPagesWorkflow:
+    """The latest release at the root, main under /dev/, assembled on every deploy."""
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def pages(cls) -> dict[Any, Any]:
+        return _load("pages.yml")
+
+    def test_a_push_or_a_finished_release_deploys(self, pages: dict[Any, Any]):
+        triggers = _triggers(pages)
+        assert set(triggers) == {"push", "workflow_run", "workflow_dispatch"}
+        assert triggers["push"] == {"branches": ["main"]}
+        assert triggers["workflow_run"] == {"workflows": ["Release"], "types": ["completed"]}
+
+    def test_only_a_release_a_push_started(self, pages: dict[Any, Any]):
+        """A pull request can add a workflow called Release; its runs must not deploy."""
+        condition = pages["jobs"]["build"]["if"]
+        assert "github.event_name != 'workflow_run'" in condition
+        assert "github.event.workflow_run.event == 'push'" in condition
+        assert "conclusion" not in condition  # a failed registry listing must not stop it
+
+    def test_it_builds_main_and_nothing_the_trigger_named(self, pages: dict[Any, Any]):
+        """Never the triggering run's commit or artifacts: main, and the releases."""
+        build = pages["jobs"]["build"]
+        (checkout,) = [s for s in build["steps"] if "checkout@" in str(s.get("uses", ""))]
+        assert "ref" not in checkout.get("with", {})
+        assert _downloads(build) == []
+        assert "head_sha" not in str(pages)
+
+    def test_it_reads_the_releases_with_a_read_only_token(self, pages: dict[Any, Any]):
+        build = pages["jobs"]["build"]
+        assert "permissions" not in build
+        assert pages["permissions"] == {"contents": "read"}
+        (step,) = [s for s in build["steps"] if "scripts/build_site.py" in str(s.get("run", ""))]
+        assert step["env"]["GH_TOKEN"] == "${{ github.token }}"  # noqa: S105 -- not a secret
+        assert "--release-archive" not in step["run"]
+
+    def test_only_the_deploy_holds_the_credential(self, pages: dict[Any, Any]):
+        holders = [
+            name
+            for name, job in pages["jobs"].items()
+            if (job.get("permissions") or {}).get("id-token") == "write"
+            or (job.get("permissions") or {}).get("pages") == "write"
+        ]
+        assert holders == ["deploy"]
+        assert pages["jobs"]["deploy"]["environment"]["name"] == "github-pages"
+
+    def test_deploys_queue_rather_than_cancel(self, pages: dict[Any, Any]):
+        assert pages["concurrency"]["cancel-in-progress"] is False
+
+
+class TestSiteBackfill:
+    """Attaching a site to a release made before releases carried one."""
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def backfill(cls) -> dict[Any, Any]:
+        return _load("site-backfill.yml")
+
+    def test_it_is_run_by_hand_for_one_tag(self, backfill: dict[Any, Any]):
+        triggers = _triggers(backfill)
+        assert set(triggers) == {"workflow_dispatch"}
+        assert triggers["workflow_dispatch"]["inputs"]["tag"]["required"] is True
+
+    def test_only_attaching_can_write(self, backfill: dict[Any, Any]):
+        """The build runs an old release's npm install and build; it holds nothing."""
+        assert backfill["permissions"] == {"contents": "read"}
+        writers = [
+            name
+            for name, job in backfill["jobs"].items()
+            if "write" in (job.get("permissions") or {}).values()
+        ]
+        assert writers == ["attach"]
+        assert backfill["jobs"]["attach"]["permissions"] == {"contents": "write"}
+
+    def test_the_tag_never_reaches_a_shell_as_code(self, backfill: dict[Any, Any]):
+        """An input interpolated into `run:` is spliced into the script before it runs."""
+        for job in backfill["jobs"].values():
+            assert "${{" not in _script(job)
+            assert "inputs.tag" not in _script(job)
+
+    def test_it_builds_with_the_backfill_script(self, backfill: dict[Any, Any]):
+        job = backfill["jobs"]["build"]
+        assert "scripts/backfill_site.py" in _script(job)
+        (checkout,) = [s for s in job["steps"] if "checkout@" in str(s.get("uses", ""))]
+        assert checkout["with"]["fetch-depth"] == 0
+        assert checkout["with"]["persist-credentials"] is False
+
+    def test_it_never_replaces_an_attached_site(self, backfill: dict[Any, Any]):
+        script = _script(backfill["jobs"]["attach"])
+        assert "gh release upload" in script
+        assert "--clobber" not in script
+        assert backfill["jobs"]["attach"]["needs"] == "build"
+
+
+def test_every_python_the_package_claims_is_tested():
+    """PyPI shows the classifiers as a promise; each version in them gets a CI job."""
+    pyproject = (WORKFLOWS.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    claimed = re.findall(r'"Programming Language :: Python :: (3\.\d+)"', pyproject)
+    tested = _load("ci.yml")["jobs"]["check"]["strategy"]["matrix"]["python"]
+    assert claimed
+    assert tested == claimed
+
+
+def test_every_pull_request_checks_the_docs_say_their_version():
+    """The switcher, the banner and canonical links rest on settings a build carries."""
+    steps = _load("ci.yml")["jobs"]["docs"]["steps"]
+    script = "\n".join(str(step.get("run", "")) for step in steps)
+    assert "scripts/site_versions.py check docs/_build/html" in script
+    assert script.index("sphinx-build") < script.index("site_versions.py check")
+
+
 def test_the_smoke_test_runs_outside_the_checkout():
     """`import scenet` succeeding in the repository root proves nothing."""
     text = (Path(__file__).resolve().parents[1] / "scripts" / "smoke_wheel.py").read_text(
