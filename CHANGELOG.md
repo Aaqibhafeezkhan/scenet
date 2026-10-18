@@ -10,6 +10,18 @@ below 1.0 means.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-18
+
+**The documentation site documents the release you install, and shows off its playground;
+and two comic-script fixes.** The site's root now serves the latest release, `main` moves under
+`/dev/`, and each minor version keeps its own path; the playground says which version it runs,
+and the home page shows its example compiled, with a button to open it there. A full stop
+now ends a PAGE heading, and no line of a comic script can stall the compiler.
+
+**Upgrading from 0.11.0.** The language, the command line and the Python API are unchanged,
+and so is every YAML document's output. A comic script changes only where a PAGE heading
+ends in a full stop, as in `PAGE 7.` or `PAGE TWENTY ONE.`: see Fixed.
+
 ### Added
 
 - **The documentation site documents what you install.** Its root, and every address
@@ -28,7 +40,7 @@ below 1.0 means.
 - **The playground says which version it runs**, with the same version switcher as the
   documentation, keeping a shared document across the switch. On `main`'s and on an old
   release's it says so, with a link to the latest. Playgrounds built before this change,
-  those of 0.11 and earlier, carry no switcher.
+  those of 0.11.0 and earlier, carry no switcher.
 - **The documentation's home page shows its example compiled** — the file `scenet build`
   writes for it, kept current with the golden files — and a button opens that example in the
   playground. The navbar names the playground beside the sections, and every link to it
