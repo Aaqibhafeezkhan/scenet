@@ -60,6 +60,12 @@ below 1.0 means.
   the panel's serialised SVG, which made the panel's first two lines something they silently
   depended on. Byte for byte the same.
 
+### Fixed
+
+- **Mutation testing runs again.** `mutation.yml` installed only the `mutation` group, and the
+  documentation site's tests need `docs`, so mutmut's clean run failed and no mutant was tried.
+  It now installs every group, as CI's test jobs do.
+
 ## [0.11.1] - 2026-10-18
 
 **The documentation site documents the release you install, and shows off its playground;
