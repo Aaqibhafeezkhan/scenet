@@ -65,6 +65,10 @@ below 1.0 means.
 - **Mutation testing runs again.** `mutation.yml` installed only the `mutation` group, and the
   documentation site's tests need `docs`, so mutmut's clean run failed and no mutant was tried.
   It now installs every group, as CI's test jobs do.
+- **The VS Code preview draws each figure with its own clip.** It inlines every SVG a build
+  wrote into one page, and a page has one set of ids, so a second panel in a slanted tier was
+  clipped by the first one's outline, and page 2's panels by page 1's frames. Each figure's
+  ids, and every reference to one, now carry a prefix of their own.
 
 ## [0.11.1] - 2026-10-18
 
