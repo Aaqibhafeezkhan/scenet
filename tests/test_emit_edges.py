@@ -57,9 +57,10 @@ def _cores(book: Book) -> dict[str, PanelCore]:
 
 
 def _assert_no_stray_text(svg: str) -> None:
-    """Character data only inside `<text>`: anything else between elements is litter."""
+    """Character data only inside `<text>`, `<title>` and `<desc>`: anything else between
+    elements is litter."""
     for element in ElementTree.fromstring(svg).iter():
-        if not element.tag.endswith("text"):
+        if not element.tag.endswith(("text", "title", "desc")):
             assert not (element.text or "").strip(), element.text
         assert not (element.tail or "").strip(), element.tail
 
@@ -72,7 +73,7 @@ class TestPagesSideBySide:
 
     def test_each_page_starts_where_the_last_one_and_its_space_end(self, book: Book):
         svg = render_pages(book.pages, _cores(book))
-        placed = re.findall(r'<g id="(page-\d+)" transform="translate\(([\d.-]+) 0\)">', svg)
+        placed = re.findall(r'<g id="(page-\d+)" transform="translate\(([\d.-]+) 0\)"[^>]*>', svg)
         assert placed == [("page-1", "0"), ("page-2", "1050"), ("page-3", "2100")]
 
     def test_panel_positions_count_on_across_pages(self, book: Book):
@@ -123,8 +124,8 @@ class TestAPanelPlacedInADocument:
     @pytest.mark.parametrize("source", [SPEECH, SETTING], ids=["bare", "with a setting"])
     def test_a_panel(self, source: str):
         core = compile_source(source).core
-        placed = placed_panel("one", core, 3, 10.0, 20.0)
-        assert placed[3] == _cut(render(core, id_prefix="p3-"))
+        placed = placed_panel("one", core, 3, 10.0, 20.0, aria=False)
+        assert placed[3] == _cut(render(core, id_prefix="p3-", aria=False))
 
     @pytest.mark.parametrize("source", [SPEECH, SETTING], ids=["bare", "with a setting"])
     def test_an_overlay(self, source: str):
@@ -136,8 +137,8 @@ class TestAPanelPlacedInADocument:
 
     def test_in_live_text(self):
         core = compile_source(SPEECH).core
-        placed = placed_panel("one", core, 1, 0.0, 0.0, live_text=True)
-        assert placed[3] == _cut(render(core, id_prefix="p1-", live_text=True))
+        placed = placed_panel("one", core, 1, 0.0, 0.0, live_text=True, aria=False)
+        assert placed[3] == _cut(render(core, id_prefix="p1-", live_text=True, aria=False))
 
     def test_a_strip_cuts_no_holes(self):
         """Only a page draws an inset over its parent; a strip lays them side by side."""
