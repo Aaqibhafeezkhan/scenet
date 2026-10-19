@@ -6,7 +6,6 @@ import time
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TextIO
 
 
 def _path(value: object) -> Path | None:
@@ -62,6 +61,22 @@ def wait_for_change(
 ) -> set[Path]:
     """Wait until a tracked file is created, removed or modified."""
     watched = set(paths)
+    try:
+        from watchfiles import watch
+    except ImportError:
+        watch = None
+
+    if watch is not None and watched:
+        directories = {path.parent for path in watched}
+        relevant = lambda change, name: Path(name).resolve() in watched
+        for changes in watch(
+            *sorted(directories),
+            watch_filter=relevant,
+            debounce=300,
+        ):
+            if changes:
+                return {Path(name).resolve() for _, name in changes}
+
     while True:
         sleep(interval)
         current = snapshot(watched)
