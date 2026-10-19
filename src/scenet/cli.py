@@ -6,6 +6,7 @@ import json
 import os
 import sys
 from collections.abc import Callable, Sequence
+from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
 
@@ -85,6 +86,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="for a multi-panel document, also lay the panels out as a strip",
     )
     build.add_argument("--quiet", action="store_true", help="suppress diagnostic notes")
+    build.add_argument(
+        "--watch",
+        action="store_true",
+        help="rebuild when the source or a file read by the compiler changes",
+    )
 
     check = subcommands.add_parser(
         "check",
@@ -217,18 +223,20 @@ def run_build(args: argparse.Namespace) -> int:
     if _refuse_unsupported([source]):
         return 2
 
-    try:
-        book = compile_book_file(source)
-    except ScenetError as exc:
-        # Every ScenetError is "your panel cannot be compiled" rather than "scenet
-        # broke", so they all get a plain message instead of a traceback.
-        #
-        # KeyError stringifies as repr(args[0]), which wraps the message in whichever
-        # quote style avoids escaping -- so a message containing an apostrophe comes
-        # out double-quoted. Reading args[0] directly sidesteps that entirely.
-        message = str(exc.args[0]) if isinstance(exc, KeyError) and exc.args else str(exc)
-        print(f"scenet: {message}", file=sys.stderr)
-        return 1
+    tracker = nullcontext(set())
+    if args.watch:
+        from scenet.watch import track_reads
+
+        tracker = track_reads()
+    with tracker as dependencies:
+        if args.watch:
+            args.watch_dependencies = dependencies
+        try:
+            book = compile_book_file(source)
+        except ScenetError as exc:
+            message = str(exc.args[0]) if isinstance(exc, KeyError) and exc.args else str(exc)
+            print(f"scenet: {message}", file=sys.stderr)
+            return 1
 
     # `foo.panel.yaml` becomes `foo.svg`, not `foo.panel.svg`.
     stem = (
@@ -548,6 +556,27 @@ def run_mcp(args: argparse.Namespace) -> int:
     return 0
 
 
+
+def run_watch(args: argparse.Namespace) -> int:
+    """Build repeatedly until interrupted, refreshing dependencies after every attempt."""
+    from scenet.watch import snapshot, wait_for_change
+
+    try:
+        while True:
+            run_build(args)
+            dependencies = set(getattr(args, "watch_dependencies", set()))
+            dependencies.add(args.source.resolve())
+            print(
+                f"scenet: watching {len(dependencies)} file(s); press Ctrl-C to stop",
+                file=sys.stderr,
+            )
+            previous = snapshot(dependencies)
+            wait_for_change(dependencies, previous)
+    except KeyboardInterrupt:
+        print("scenet: watch stopped", file=sys.stderr)
+        return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the `scenet` command.
 
@@ -569,7 +598,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "build":
-        return run_build(args)
+        return run_watch(args) if args.watch else run_build(args)
     if args.command == "check":
         return run_check(args)
     if args.command == "schema":
