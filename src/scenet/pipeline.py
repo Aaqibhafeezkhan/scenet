@@ -61,7 +61,7 @@ from scenet.geom import BBox, Vector, rounded
 from scenet.images import SuppliedImage, load_image
 from scenet.ir import Face, Fit, Mark, PanelIR, PanelSpec, SayEvent, Side
 from scenet.lettering import Lettering, typeface_for
-from scenet.paths import Folder
+from scenet.paths import Folder, record_dependency, track_dependencies
 from scenet.solve.backdrop import ResolvedBackdrop, solve_backdrop
 from scenet.solve.balloons import place_script
 from scenet.solve.camera import CameraSolution
@@ -1071,6 +1071,7 @@ def compile_book_file(
     *,
     library: PuppetLibrary | None = None,
     metrics: FontMetrics | None = None,
+    dependencies: set[Path] | None = None,
 ) -> Book:
     """Compile any supported document and its pages, choosing the frontend by extension.
 
@@ -1078,6 +1079,7 @@ def compile_book_file(
         path: A `*.panel.yaml`, `*.scene.yaml` or `*.script` file.
         library: Characters to draw from. Defaults to the two shipped puppets.
         metrics: Font to measure lettering against.
+        dependencies: Optional set to populate with files and directories read during compilation.
 
     Returns:
         Every panel, and the pages they are laid out on -- none for a single panel or a
@@ -1094,7 +1096,9 @@ def compile_book_file(
         raise ValueError(
             f"{path}: unsupported extension '{path.suffix}'; expected one of {supported}"
         )
-    return _compile_document(loader(path), library, metrics, path.parent)
+    with track_dependencies(dependencies):
+        record_dependency(path)
+        return _compile_document(loader(path), library, metrics, path.parent)
 
 
 def compile_document(

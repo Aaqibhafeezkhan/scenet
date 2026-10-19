@@ -11,7 +11,7 @@ Four commands: `build` compiles a document, `check` validates one without compil
 ## `scenet build`
 
 ```
-scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet]
+scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet] [--watch]
 ```
 
 Compiles `SOURCE` to SVG. The frontend is chosen by extension:
@@ -70,6 +70,13 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
 `--quiet`
 : Suppress the `wrote` and `note:` lines. You do not normally want this: the notes are
   where the compiler tells you it did something you did not ask for.
+
+`--watch`
+: Build once, then rebuild when the source or a file read during compilation changes.
+  Failed builds are reported and the watcher keeps running, so saving a fix triggers another
+  build. Watch mode does not start a server or reload a browser. It uses standard-library
+  polling by default; install `scenet[watch]` to use `watchfiles` when available. Press
+  Ctrl-C to stop watching.
 
 ### Output naming
 

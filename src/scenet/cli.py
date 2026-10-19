@@ -18,6 +18,7 @@ from scenet.emit.svg import render
 from scenet.errors import ScenetError
 from scenet.pipeline import FRONTENDS, Book, compile_book_file
 from scenet.schema import panel_schema, scene_schema
+from scenet.watch import watch_loop
 
 DESCRIPTION = "Compile a semantic comic-panel description into SVG."
 
@@ -102,6 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="for a multi-panel document, also lay the panels out as a strip",
     )
     build.add_argument("--quiet", action="store_true", help="suppress diagnostic notes")
+    build.add_argument(
+        "--watch",
+        action="store_true",
+        help="rebuild when a source or compilation dependency changes",
+    )
 
     check = subcommands.add_parser(
         "check",
@@ -215,10 +221,32 @@ def _refuse_unsupported(paths: Sequence[Path]) -> bool:
 
 
 def run_build(args: argparse.Namespace) -> int:
+    """Run a one-shot build or keep rebuilding while compilation inputs change."""
+    if not args.watch:
+        return _run_build_once(args)
+
+    dependencies: set[Path] = set()
+    status = _run_build_once(args, dependencies)
+    if status == 2:
+        return status
+
+    def rebuild() -> None:
+        dependencies.clear()
+        _run_build_once(args, dependencies)
+
+    try:
+        watch_loop(dependencies, rebuild)
+    except KeyboardInterrupt:
+        return 0
+    return status
+
+
+def _run_build_once(args: argparse.Namespace, dependencies: set[Path] | None = None) -> int:
     """Run the `build` subcommand: compile a document and write its outputs.
 
     Args:
         args: Parsed arguments from :func:`build_parser <scenet.cli.build_parser>`.
+        dependencies: Optional set to populate with compilation inputs for watch mode.
 
     Returns:
         A process exit status: `0` on success, `1` when the document could not be
@@ -237,7 +265,7 @@ def run_build(args: argparse.Namespace) -> int:
         return 2
 
     try:
-        book = compile_book_file(source)
+        book = compile_book_file(source, dependencies=dependencies)
     except ScenetError as exc:
         # Every ScenetError is "your panel cannot be compiled" rather than "scenet
         # broke", so they all get a plain message instead of a traceback.

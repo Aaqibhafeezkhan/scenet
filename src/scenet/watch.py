@@ -1,0 +1,89 @@
+"""Dependency-aware watch mode for the build command."""
+
+import hashlib
+import time
+from collections.abc import Callable
+from pathlib import Path
+
+try:
+    from watchfiles import watch as _watch
+except ImportError:
+    _watch = None
+
+
+def snapshot(paths: set[Path]) -> tuple[tuple[str, object], ...]:
+    """Return a stable fingerprint of tracked files and directories."""
+    result: list[tuple[str, object]] = []
+    for path in sorted((item.resolve() for item in paths), key=str):
+        try:
+            if path.is_dir():
+                children = []
+                for child in sorted(path.iterdir(), key=lambda item: item.name):
+                    try:
+                        stat = child.stat()
+                        children.append(
+                            (child.name, child.is_dir(), stat.st_mtime_ns, stat.st_size)
+                        )
+                    except OSError:
+                        children.append((child.name, "unavailable"))
+                result.append((str(path), ("directory", tuple(children))))
+            else:
+                digest = hashlib.sha256(path.read_bytes()).digest()
+                result.append((str(path), ("file", digest)))
+        except OSError:
+            result.append((str(path), ("missing",)))
+    return tuple(result)
+
+
+def _wait(interval: float, dependencies: set[Path]) -> None:
+    """Wait for a filesystem event with watchfiles, or fall back to standard-library polling."""
+    if _watch is None:
+        time.sleep(interval)
+        return
+
+    paths = {path.resolve() for path in dependencies}
+    directories = {path if path.is_dir() else path.parent for path in paths}
+    if not directories:
+        time.sleep(interval)
+        return
+
+    watched_dirs = {path for path in paths if path.is_dir()}
+
+    def relevant(_change: object, raw_path: str) -> bool:
+        path = Path(raw_path).resolve()
+        return path in paths or any(
+            path == directory or directory in path.parents for directory in watched_dirs
+        )
+
+    events = _watch(
+        *sorted(directories, key=str),
+        watch_filter=relevant,
+        debounce=100,
+        step=50,
+        rust_timeout=max(50, int(interval * 1000)),
+        yield_on_timeout=True,
+    )
+    next(events, None)
+    events.close()
+
+
+def watch_loop(
+    dependencies: set[Path],
+    rebuild: Callable[[], object],
+    *,
+    interval: float = 0.5,
+    wait: Callable[[float, set[Path]], None] = _wait,
+    take_snapshot: Callable[[set[Path]], object] = snapshot,
+    max_iterations: int | None = None,
+) -> None:
+    """Rebuild after a dependency changes; injected wait/snapshot make the loop testable."""
+    previous = take_snapshot(dependencies)
+    iterations = 0
+    while max_iterations is None or iterations < max_iterations:
+        wait(interval, dependencies)
+        current = take_snapshot(dependencies)
+        if current != previous:
+            dependencies.clear()
+            rebuild()
+            previous = take_snapshot(dependencies)
+        iterations += 1
