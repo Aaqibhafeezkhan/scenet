@@ -135,7 +135,7 @@ def reportlab_pdf() -> bytes:
 
 def inspect_pdf(data: bytes) -> dict[str, bool]:
     """Check the structural requirements that can be asserted without a preflight tool."""
-    text = data.decode("latin-1")
+    text = " ".join(data.decode("latin-1").split())
     return {
         "pdf_header": data.startswith(b"%PDF-"),
         "trim_box": "/TrimBox [9 9 603 783]" in text,
