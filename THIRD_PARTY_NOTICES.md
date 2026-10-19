@@ -3,7 +3,7 @@
 Scenet is distributed under the [BSD Zero Clause License](LICENSE) (0BSD). It incorporates and depends on the
 third-party components listed below.
 
-## Fonts
+## Optional print dependency\n\n### ReportLab\n\nThe optional `scenet[print]` extra uses ReportLab, licensed under the BSD license. It is not installed by the base package.\n\n## Fonts
 
 ### Source Sans Pro
 

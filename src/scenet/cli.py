@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     build.add_argument(
+        "--pdf",
+        action="store_true",
+        help="emit native Core-based CMYK print PDF instead of SVG (requires scenet[print])",
+    )
+    build.add_argument(
         "--core",
         action="store_true",
         help="also write the resolved Panel Core JSON, the inspectable intermediate tier",
@@ -257,6 +262,23 @@ def run_build(args: argparse.Namespace) -> int:
         .removesuffix(".panel")
         .removesuffix(".scene")
     )
+    if args.pdf:
+        from scenet.emit.pdf import render_book_pdf
+
+        target = Path(args.output) if args.output else source.with_name(f"{stem}.pdf")
+        if target.is_dir():
+            target = target / f"{stem}.pdf"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            render_book_pdf(book, target)
+        except (RuntimeError, ValueError, OSError) as exc:
+            print(f"scenet: {exc}", file=sys.stderr)
+            return 1
+        if not args.quiet:
+            print(f"wrote {target}")
+            print("note: PDF output is CMYK with trim/bleed boxes; PDF/X conformance is not asserted")
+        return 0
+
     base = _output_base(args.output, source, f"{stem}.svg")
     base.parent.mkdir(parents=True, exist_ok=True)
 
