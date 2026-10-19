@@ -58,6 +58,7 @@ def wait_for_change(
     *,
     interval: float = 0.5,
     sleep: Callable[[float], None] = time.sleep,
+    use_native: bool = True,
 ) -> set[Path]:
     """Wait until a tracked file is created, removed or modified."""
     watched = set(paths)
@@ -66,9 +67,11 @@ def wait_for_change(
     except ImportError:
         watch = None
 
-    if watch is not None and watched:
+    if use_native and watch is not None and watched:
         directories = {path.parent for path in watched}
-        relevant = lambda change, name: Path(name).resolve() in watched
+
+        def relevant(change: object, name: str) -> bool:
+            return Path(name).resolve() in watched
         for changes in watch(
             *sorted(directories),
             watch_filter=relevant,
