@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-import scenet.cli as cli
+from scenet import cli
 from scenet.pipeline import compile_book_file
 from scenet.watch import snapshot, watch_loop
 
