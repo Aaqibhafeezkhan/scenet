@@ -116,6 +116,8 @@ def reportlab_pdf() -> bytes:
     )
     doc.setTitle("Scenet PDF print spike")
     doc.setAuthor("Scenet")
+    doc.setTrimBox(TRIM)
+    doc.setBleedBox((0, 0, PAGE_W, PAGE_H))
     doc.setFillOverprint(1)
     doc.setStrokeOverprint(1)
     doc.setFillColor(CMYKColor(0, 0, 0, 1))
@@ -128,8 +130,6 @@ def reportlab_pdf() -> bytes:
     doc.showPage()
     doc.save()
     data = stream.getvalue()
-    # ReportLab does not expose all page boxes consistently across versions.
-    # Mark this as a prototype; box assertions are part of the inspection checklist.
     return data
 
 
