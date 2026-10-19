@@ -55,6 +55,13 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
 : Suppress the `wrote` and `note:` lines. You do not normally want this: the notes are
   where the compiler tells you it did something you did not ask for.
 
+`--watch`
+: Build once, then rebuild when the source or any file read during compilation changes.
+  A failed build reports its error and keeps watching, so a malformed save does not end the
+  loop. Install `scenet[watch]` to use native file-system notifications; without that extra,
+  Scenet polls tracked files every half-second. Watch status goes to stderr, not into generated
+  files. Press Ctrl-C to stop; the command exits with status 0.
+
 ### Output naming
 
 A single-panel document writes to the requested name. A multi-panel document suffixes each
@@ -106,6 +113,10 @@ scenet build examples/duel.panel.yaml --core --debug
 
 ```bash
 scenet build examples/sequence.scene.yaml --strip
+```
+
+```bash
+scenet build examples/duel.panel.yaml --watch
 ```
 
 ```bash
