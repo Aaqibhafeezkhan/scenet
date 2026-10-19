@@ -4,7 +4,7 @@
 
 Keep PDF emission as a third emitter over resolved Panel Core. Do not convert the SVG: the SVG has already discarded the semantic distinction between lettering, balloon borders, figure outlines and large dark masses, and it cannot express PDF overprint. The existing Page Core supplies page dimensions and resolved frames; trim and bleed should be added to page geometry rather than inferred by the emitter.
 
-This note is the design decision and implementation boundary, not a claim of PDF/X conformance. A real PDF/X claim requires a suitable preflight run and recorded evidence.
+This note records the design decision and prototype findings, not a claim of PDF/X conformance. A real PDF/X claim requires a PDF/X-capable preflight run and recorded evidence.
 
 ## Candidate comparison
 
@@ -33,7 +33,7 @@ The SVG atmosphere veil uses `feTurbulence`, which has no direct PDF vector equi
 
 Target a constrained PDF suitable for print first, but do not label output PDF/X-1a or PDF/X-4 until a preflight tool validates it. PDF/X-1a would require CMYK/spot colours and flattened transparency; PDF/X-4 permits live transparency and requires an output intent. The first release should state its exact guarantees and limitations in the CLI and print how-to.
 
-## Implementation sequence
+## Runnable prototype and findings\n\n`tools/pdf_print_spike.py` emits the same one-page fixture with a dependency-free PDF writer or ReportLab. It records the byte count, SHA-256, and structural checks. Run each backend twice and compare hashes; inspect page boxes and the content stream with a PDF inspector. ReportLab is an optional install for the spike only, not a base dependency.\n\nThe prototype comparison produced valid, readable one-page PDFs from both backends. `pdfinfo` reported PDF 1.4 and Letter-size media pages; `pdftotext` extracted the fixture lettering; Ghostscript parsed both with `-sDEVICE=nullpage` without errors. Both PDFs exposed the expected TrimBox (9, 9, 603, 783), BleedBox (0, 0, 612, 792), CMYK operators and fill/stroke overprint state. Two repeated emissions from each backend were byte-identical in the prototype run. Direct writer output was 1,202 bytes (SHA-256 `1dce22217925076c3bfc7bf40cc9599a3d0d7945a87e5553758a77a7b6fcead8`); ReportLab output was 1,537 bytes (SHA-256 `e1e439ff6f196223afa0778e2e50eccc3433b450ec6dc892075d07e2cd59610e`). These hashes describe the fixed fixture, not a production renderer.\n\nThis was a structural/parser check, **not PDF/X preflight**. No PDF/X-capable preflight tool is available in the execution environment, so conformance, output intent, printer-specific ink limits, and colour separations still require manual prepress validation. The fixture uses a built-in Helvetica face and live text for simplicity; it does not yet exercise Scenet Panel Core glyph outlines or its full range of drawing primitives.\n\n## Implementation sequence
 
 1. Add a `print` optional dependency group for ReportLab only if the spike's working prototype proves it materially reduces code and risk; it must remain outside base dependencies and pass the existing licence gate.
 2. Prototype the same small Core fixture using ReportLab and a direct writer. Compare source size, emitted PDF object structure, overprint state, metadata stability and repeated-build byte identity.
@@ -44,4 +44,4 @@ Target a constrained PDF suitable for print first, but do not label output PDF/X
 
 ## Acceptance boundary
 
-This spike records the architecture and constraints. It does **not** mark the requested one-panel dual-prototype and external preflight checkbox complete: those require running both prototypes and inspecting their generated PDFs with a preflight tool. The production emitter should not begin until that evidence resolves the open implementation choice.
+The dual-backend structural prototype now exists and has been parser-checked. The issue’s manual PDF/X preflight acceptance item remains open, as does exercising actual Panel Core output. Do not claim PDF/X conformance or start production integration until those checks resolve the implementation choice.
