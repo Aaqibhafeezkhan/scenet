@@ -1,6 +1,7 @@
 """Dependency-aware watch mode for the build command."""
 
 import hashlib
+import importlib
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -47,7 +48,7 @@ def _wait(interval: float, dependencies: set[Path]) -> None:
         return
 
     try:
-        from watchfiles import watch
+        watch = importlib.import_module("watchfiles").watch
     except ImportError:
         time.sleep(interval)
         return
