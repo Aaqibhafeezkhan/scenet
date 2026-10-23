@@ -248,6 +248,7 @@ def run_build(args: argparse.Namespace) -> int:
         except Exception as exc:
             print(f"scenet: initial watch build failed: {exc}", file=sys.stderr)
             status = 1
+
         # A bad initial save, missing source or output-name clash is recoverable in watch
         # mode. Keep watching until the source is fixed or the user stops the command.
         def rebuild() -> None:
