@@ -10,6 +10,7 @@ from functools import partial
 from pathlib import Path
 
 from scenet import __version__
+from scenet.assets.artwork import CONTRACT_SUFFIX
 from scenet.diagnostics import Diagnostic, diagnose_file, to_sarif
 from scenet.emit.debug_svg import render_debug
 from scenet.emit.page import render_page
@@ -17,8 +18,7 @@ from scenet.emit.strip import render_strip
 from scenet.emit.svg import render
 from scenet.errors import ScenetError
 from scenet.pipeline import FRONTENDS, Book, compile_book_file
-from scenet.schema import panel_schema, scene_schema
-from scenet.watch import watch_loop
+from scenet.schema import artwork_schema, panel_schema, scene_schema
 
 DESCRIPTION = "Compile a semantic comic-panel description into SVG."
 
@@ -225,16 +225,24 @@ def run_build(args: argparse.Namespace) -> int:
     if not args.watch:
         return _run_build_once(args)
 
-    dependencies: set[Path] = set()
-    status = _run_build_once(args, dependencies)
-    if status == 2:
-        return status
-
-    def rebuild() -> None:
-        dependencies.clear()
-        _run_build_once(args, dependencies)
-
+    dependencies: set[Path] = {args.source.resolve()}
     try:
+        status = _run_build_once(args, dependencies)
+        # A bad initial save, missing source or output-name clash is recoverable in watch
+        # mode. Keep watching until the source is fixed or the user stops the command.
+        from scenet.watch import watch_loop
+
+        def rebuild() -> None:
+            # Keep the previous dependency set if this build fails. Add dependencies seen
+            # by the new attempt as well, so a partial failure cannot blind the watcher.
+            attempted: set[Path] = {args.source.resolve()}
+            try:
+                _run_build_once(args, attempted)
+            except Exception as exc:
+                print(f"scenet: watch rebuild failed: {exc}", file=sys.stderr)
+            finally:
+                dependencies.update(attempted)
+
         watch_loop(dependencies, rebuild)
     except KeyboardInterrupt:
         return 0
