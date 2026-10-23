@@ -76,7 +76,6 @@ def test_snapshot_detects_content_and_directory_changes(tmp_path: Path) -> None:
     assert snapshot(dependencies) != before
 
 
-
 def test_watch_loop_debounces_quick_writes() -> None:
     dependencies = {Path("source.panel.yaml")}
     state = {"revision": 0, "ticks": 0}
