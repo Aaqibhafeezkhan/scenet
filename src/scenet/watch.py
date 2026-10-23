@@ -57,7 +57,7 @@ def _wait(interval: float, dependencies: set[Path]) -> None:
     def relevant(_change: object, raw_path: str) -> bool:
         path = Path(raw_path).resolve()
         return path in paths or any(
-            path == directory or directory in path.parents for directory in watched_dirs
+            path == directory or directory in path.parents for directory in directories
         )
 
     events = watch(
