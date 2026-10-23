@@ -1,7 +1,7 @@
 """Tests for dependency tracking and watch mode."""
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from scenet import cli
 from scenet.pipeline import compile_book_file
