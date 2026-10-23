@@ -44,6 +44,7 @@ def test_watch_loop_rebuilds_again_after_a_failed_build() -> None:
         rebuild,
         wait=wait,
         take_snapshot=lambda _paths: state["revision"],
+        debounce=0,
         max_iterations=2,
     )
 
