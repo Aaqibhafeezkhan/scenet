@@ -11,7 +11,7 @@ Four commands: `build` compiles a document, `check` validates one without compil
 ## `scenet build`
 
 ```
-scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet] [--watch]
+scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet]
 ```
 
 Compiles `SOURCE` to SVG. The frontend is chosen by extension:
@@ -247,6 +247,10 @@ note as information rather than a red squiggle.
 | `scenet/unknown-pose` | error | A `pose` naming one its puppet does not declare |
 | `scenet/unknown-expression` | error | An `expression` naming one its puppet does not declare |
 | `scenet/image-file` | error | A picture in `setting.image` that is absolute, missing, not a PNG or JPEG, turned by its EXIF orientation, or named by text with no folder |
+| `scenet/artwork-contract` | error | A picture whose figures the panel casts has no artwork contract beside it (`art/p01.png` → `art/p01.art.yaml`), or one that is not YAML, repeats or misspells a key, holds a value out of place, puts a point off the picture, or was measured on a picture of another size. Reported in the contract when the document is checked as a file |
+| `scenet/unknown-figure` | error | A cast `figure` in a panel that names no picture, or a line spoken or sound made by a figure the panel's picture does not draw |
+| `scenet/conflicting-cast` | error | A cast member with both `reference` and `figure`, a puppet's `pose`, `expression`, `marks`, `at` or `facing` on a figure, a cast mixing puppets and figures, or two members playing one figure |
+| `scenet/figure-staging` | error | A staging relation naming a figure a picture draws, or a `camera` on a panel whose cast is all figures |
 | `scenet/font-file` | error | A font in `lettering.font` that is absolute, missing, not a font, or named by text with no folder |
 | `scenet/layout` | error | Valid, but no layout satisfies its required constraints (`--deep` only) |
 | `scenet/balloon-placement` | error | No legal position exists for a balloon (`--deep` only) |
@@ -258,6 +262,11 @@ note as information rather than a red squiggle.
 | `scenet/internal` | error | A failure with no more specific rule — worth reporting |
 
 ### Source positions
+
+A finding is located in the file it is about, which is usually the document checked. A fault inside
+a picture's [artwork contract](asset_contract.md#artwork-contracts) is located in the contract —
+its own path, line and column — since that is the file to open to fix it; checked as text, with no
+file of its own, the document points at the line naming the picture instead.
 
 `yaml.safe_load` discards the position of every value, so the document is composed a
 second time with `yaml.compose`, whose node tree carries `start_mark` and `end_mark`. Those
@@ -357,7 +366,7 @@ close an import cycle.
 ## `scenet schema`
 
 ```
-scenet schema [-o OUTPUT] [--scene]
+scenet schema [-o OUTPUT] [--scene | --artwork]
 ```
 
 Emits the JSON Schema for a panel document, derived from the same pydantic models the
@@ -373,9 +382,16 @@ the editor suggests cannot drift from what compiles — see
   same keys as a panel — where they act as defaults every panel inherits — plus `panels:`,
   whose members may additionally carry `over:`.
 
+`--artwork`
+: Emit the schema for an [artwork contract](asset_contract.md#artwork-contracts), the
+  `*.art.yaml` file beside a supplied picture that declares the figures it draws. What a
+  schema cannot say — every point on the picture, every region a simple polygon, the size
+  the picture's own — `scenet check` does.
+
 ```bash
 scenet schema -o panel.schema.json
 scenet schema --scene -o scene.schema.json
+scenet schema --artwork -o artwork.schema.json
 ```
 
 The output is sorted and indented, so it is stable under version control.
