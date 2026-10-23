@@ -17,7 +17,9 @@ Generated text is **templated English**, and that is its limit: a French script'
 read in French, but the words round its dialogue are English. Every phrase is in a table
 below, keyed by the enum it reads, so a value with no phrase is a test failure rather
 than a gap a reader hears. Nothing depends on a locale, or on the order a set or a dict
-happens to iterate in: the cast is read left to right, ties broken by id.
+happens to iterate in: the cast is read in reading order -- left to right, or right to left
+for a comic read that way -- ties broken by id. Where each stands, "left" or "right", is
+said as it is on the panel either way.
 
 This sees no artwork. Where a figure is comes in as one number, its face's x, the same
 rounded value Panel Core records.
@@ -31,6 +33,7 @@ from scenet.ir import (
     CameraAngle,
     CaptionEvent,
     CaptionKind,
+    Direction,
     Mark,
     MassKind,
     PanelIR,
@@ -311,10 +314,18 @@ def describe(panel: PanelIR, faces: Mapping[str, float], width: float) -> str:
     if panel.description is not None:
         return panel.description
     setting = _setting(panel.setting)
-    if not panel.cast:
+    # Only who is drawn: a figure the panel's picture does not draw is not in it (#71).
+    # In reading order: the panel is not mirrored, so right to left is from the far side.
+    sign = -1.0 if panel.direction is Direction.RTL else 1.0
+    cast = sorted(
+        (actor for actor in panel.cast if actor in faces), key=lambda a: (sign * faces[a], a)
+    )
+    if not cast:
         # A picture is not nothing, though nothing can be said of what it shows.
         empty = "A panel with no figures." if panel.setting.image else "An empty panel."
         return setting or empty
-    cast = sorted(panel.cast, key=lambda actor: (faces[actor], actor))
     figures = "; ".join(_figure(panel, actor, faces[actor], width) for actor in cast)
-    return " ".join(part for part in (_shot(panel), setting, f"{figures}.") if part)
+    # The shot of a cast a picture draws is whatever the artist drew, which nobody told
+    # the compiler: no shot is said rather than a default one.
+    shot = "" if panel.drawn_by_its_picture else _shot(panel)
+    return " ".join(part for part in (shot, setting, f"{figures}.") if part)

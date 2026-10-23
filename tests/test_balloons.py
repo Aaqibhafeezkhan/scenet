@@ -1,15 +1,26 @@
 """Balloon placement rules that are easy to get subtly wrong."""
 
 from collections.abc import Sequence
+from typing import Any
 
 import pytest
+from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import Polygon, box
 from shapely.geometry.base import BaseGeometry
 
 from scenet.assets.kinematics import ResolvedPuppet
 from scenet.errors import BalloonPlacementError
 from scenet.geom import BBox, Circle, Point, Vector
-from scenet.ir import CaptionEvent, CaptionKind, Face, PlacementZone, SayEvent, Side, TypeSize
+from scenet.ir import (
+    CaptionEvent,
+    CaptionKind,
+    Face,
+    PlacementZone,
+    SayEvent,
+    SfxEvent,
+    Side,
+    TypeSize,
+)
 from scenet.solve.balloons import (
     READING_EPSILON,
     W_CAPTION_EDGE,
@@ -23,6 +34,7 @@ from scenet.solve.balloons import (
     _curve_hits,
     _edge_slack,
     _emanata_cost,
+    _keep_out_shape,
     _Limits,
     _mass_cost,
     _nearer_side,
@@ -37,10 +49,23 @@ from scenet.solve.balloons import (
     place_script,
     route_tail,
 )
+from scenet.solve.speakers import Bystanders, Speaker, speaker_of
 from scenet.solve.text import ITALIC_FONT_PATH, Styled, Typeface, layout_text, load_metrics
 
 
 def _actor(
+    name: str = "a",
+    face: Circle | None = None,
+    *,
+    mouth: Point | None = None,
+    eyes: Point | None = None,
+    gaze: Vector | None = None,
+) -> Speaker:
+    """A puppet as lettering sees it: what `place_script` is handed for a posed one."""
+    return speaker_of(_puppet(name, face, mouth=mouth, eyes=eyes, gaze=gaze))
+
+
+def _puppet(
     name: str = "a",
     face: Circle | None = None,
     *,
@@ -409,12 +434,23 @@ class TestCaptionText:
 class TestBalloonScore:
     PANEL = BBox(0.0, 0.0, 400.0, 400.0)
 
-    def _score(self, speaker: ResolvedPuppet, candidate: BBox, limits: _Limits | None = None):
+    def _score(
+        self,
+        speaker: Speaker,
+        candidate: BBox,
+        limits: _Limits | None = None,
+        *,
+        actor_id: str = "speaker",
+        hulls: dict[str, Polygon] | None = None,
+    ):
+        # Keyed by an actor id that is not the puppet's name, as `ALICE: {reference:
+        # alice}` is: the two are different namespaces, and only the id keys the cast.
         return _score(
             candidate,
             speaker=speaker,
-            actors={speaker.name: speaker},
-            hulls={},
+            speaker_id=actor_id,
+            actors={actor_id: speaker},
+            hulls=hulls or {},
             panel=self.PANEL,
             prefer=None,
             placed=[],
@@ -427,6 +463,19 @@ class TestBalloonScore:
         limits = _Limits(blocked=(BBox(0.0, 0.0, 50.0, 50.0),))
         assert self._score(_actor(), candidate) < float("inf")
         assert self._score(_actor(), candidate, limits) == float("inf")
+
+    def test_the_speaker_is_forgiven_by_actor_id_not_puppet_name(self):
+        """A balloon on its own speaker's body costs half, whatever the actor is called.
+
+        The cast is keyed by actor id; the puppet's name is another namespace. An actor
+        `ALICE` drawn by the puppet `alice` is still the one speaking.
+        """
+        speaker = _actor(name="bob", face=Circle(300.0, 300.0, 20.0))
+        candidate = BBox(20.0, 20.0, 60.0, 30.0)
+        body = _square(0.0, 0.0, 100.0, 100.0)
+        bare = self._score(speaker, candidate, actor_id="guard")
+        covered = self._score(speaker, candidate, actor_id="guard", hulls={"guard": body})
+        assert covered - bare == pytest.approx(0.5 * W_OCCLUSION)
 
     def test_a_speaker_without_a_mouth_is_spoken_from_the_face(self):
         face = Circle(200.0, 200.0, 20.0)
@@ -446,7 +495,7 @@ class TestCaptionScore:
         self,
         candidate: BBox,
         *,
-        actors: dict[str, ResolvedPuppet] | None = None,
+        actors: dict[str, Speaker] | None = None,
         hulls: dict[str, Polygon] | None = None,
         emanata: Sequence[BaseGeometry] = (),
     ) -> float:
@@ -503,7 +552,7 @@ class TestPlaceScript:
     PANEL = BBox(0.0, 0.0, 600.0, 400.0)
     FACE = Circle(450.0, 280.0, 25.0)
 
-    def _speaker(self) -> dict[str, ResolvedPuppet]:
+    def _speaker(self) -> dict[str, Speaker]:
         return {"a": _actor(face=self.FACE)}
 
     def _say(self, text: str = "Over here!", prefer: PlacementZone | None = None) -> SayEvent:
@@ -609,6 +658,131 @@ class TestPlaceScript:
         )
 
 
+class TestFiguresAPictureDraws:
+    """What #71 needs of the placer: faces it may not cover, mouths, bodies, keep-outs.
+
+    A figure a picture draws reaches `place_script` as a `Speaker` like any puppet, or as a
+    bystander when nobody cast it. These hold for whichever it is.
+    """
+
+    PANEL = BBox(0.0, 0.0, 600.0, 400.0)
+    FACE = Circle(450.0, 280.0, 25.0)
+
+    def _say(self, text: str = "Over here!") -> SayEvent:
+        return SayEvent(by="a", text=text)
+
+    def _natural(self) -> BBox:
+        return (
+            place_script([self._say()], {"a": _actor(face=self.FACE)}, self.PANEL).balloons[0].box
+        )
+
+    def test_no_balloon_touches_a_bystanders_face(self):
+        natural = self._natural()
+        # A face nobody cast, exactly where the balloon would otherwise go.
+        face = Circle(natural.centre.x, natural.centre.y, 30.0)
+        bystander = Speaker(face=face, mouth=face.centre)
+        layout = place_script(
+            [self._say()], {"a": _actor(face=self.FACE)}, self.PANEL, bystanders=[bystander]
+        )
+        assert not layout.balloons[0].box.intersects_circle(face)
+
+    def test_no_caption_touches_a_bystanders_face(self):
+        natural = place_script([CaptionEvent(text="Later.")], {}, self.PANEL).captions[0].box
+        face = Circle(natural.centre.x, natural.centre.y, 20.0)
+        layout = place_script(
+            [CaptionEvent(text="Later.")],
+            {},
+            self.PANEL,
+            bystanders=[Speaker(face=face, mouth=face.centre)],
+        )
+        assert not layout.captions[0].box.intersects_circle(face)
+
+    def test_a_bystanders_body_costs_and_is_never_forgiven(self):
+        candidate = BBox(0.0, 0.0, 10.0, 10.0)
+        body = _square(0.0, 0.0, 10.0, 10.0)
+        assert _occlusion_cost(candidate, {}, "a", [body]) == pytest.approx(W_OCCLUSION)
+        assert _occlusion_cost(candidate, {}, None, [body]) == pytest.approx(W_OCCLUSION)
+
+    def test_a_keep_out_moves_a_balloon_off_it_when_there_is_room(self):
+        natural = self._natural()
+        region = [
+            Point(natural.x, natural.y),
+            Point(natural.right, natural.y),
+            Point(natural.right, natural.bottom),
+            Point(natural.x, natural.bottom),
+        ]
+        moved = place_script(
+            [self._say()], {"a": _actor(face=self.FACE)}, self.PANEL, keep_out=[region]
+        ).balloons[0]
+        assert moved.box.overlap_area(natural) == 0
+
+    def test_a_keep_out_never_forbids(self):
+        """Over the whole panel there is nowhere free, and the balloon is still placed."""
+        whole = [Point(0.0, 0.0), Point(600.0, 0.0), Point(600.0, 400.0), Point(0.0, 400.0)]
+        kept = place_script(
+            [self._say()], {"a": _actor(face=self.FACE)}, self.PANEL, keep_out=[whole]
+        ).balloons[0]
+        assert self.PANEL.contains(kept.box)
+        assert not kept.box.intersects_circle(self.FACE)
+
+    def test_two_keep_outs_that_overlap_are_paid_for_once(self):
+        square = [Point(0.0, 0.0), Point(10.0, 0.0), Point(10.0, 10.0), Point(0.0, 10.0)]
+        shifted = [Point(5.0, 0.0), Point(15.0, 0.0), Point(15.0, 10.0), Point(5.0, 10.0)]
+        merged = _keep_out_shape([square, shifted])
+        assert merged.area == pytest.approx(150.0)
+        candidate = BBox(0.0, 0.0, 15.0, 10.0)
+        assert _emanata_cost(candidate, [merged]) == pytest.approx(W_EMANATA_OCCLUSION)
+
+    def test_the_tail_ends_at_a_mouth_outside_the_face(self):
+        """A mouth need not be on the face -- whatever the sound comes from."""
+        mouth = Point(450.0, 340.0)
+        speaker = Speaker(face=self.FACE, mouth=mouth)
+        balloon = place_script([self._say()], {"a": speaker}, self.PANEL).balloons[0]
+        assert balloon.tail.end == mouth
+
+    def test_the_tail_is_aimed_at_a_mouth_inside_the_face_and_stops_on_it(self):
+        mouth = Point(455.0, 290.0)
+        speaker = Speaker(face=self.FACE, mouth=mouth)
+        tail = place_script([self._say()], {"a": speaker}, self.PANEL).balloons[0].tail
+        assert tail.end.distance_to(self.FACE.centre) == pytest.approx(self.FACE.r)
+        # On the line from where it starts to the mouth.
+        cross = (tail.end.x - tail.start.x) * (mouth.y - tail.start.y) - (
+            tail.end.y - tail.start.y
+        ) * (mouth.x - tail.start.x)
+        assert cross == pytest.approx(0.0, abs=1e-6)
+
+    def test_a_mouth_outside_the_panel_is_pointed_at_from_its_edge(self):
+        """A `cover` crop can push a mouth out of the panel; the tail stops on the frame."""
+        face = Circle(560.0, 200.0, 30.0)
+        speaker = Speaker(face=face, mouth=Point(640.0, 200.0))
+        tail = place_script([self._say()], {"a": speaker}, self.PANEL).balloons[0].tail
+        assert tail.end.x == pytest.approx(600.0)
+        assert 0.0 <= tail.end.y <= 400.0
+
+    def test_a_mouth_outside_a_slanted_panel_is_pointed_at_from_its_outline(self):
+        outline = [(0.0, 0.0), (560.0, 0.0), (600.0, 400.0), (0.0, 400.0)]
+        speaker = Speaker(face=Circle(520.0, 200.0, 25.0), mouth=Point(640.0, 200.0))
+        tail = (
+            place_script([self._say()], {"a": speaker}, self.PANEL, outline=outline)
+            .balloons[0]
+            .tail
+        )
+        edge = Polygon(outline).exterior
+        assert edge.distance(ShapelyPoint(tail.end.x, tail.end.y)) == pytest.approx(0.0, abs=1e-6)
+
+    def test_a_speaker_with_no_body_costs_nothing_to_cover(self):
+        speaker = Speaker(face=self.FACE, mouth=self.FACE.centre)
+        layout = place_script([self._say()], {"a": speaker}, self.PANEL)
+        assert not layout.balloons[0].box.intersects_circle(self.FACE)
+
+    def test_a_speaker_with_no_gaze_blocks_no_line_of_sight(self):
+        candidate = BBox(80.0, 170.0, 40.0, 20.0)
+        unlooking = Speaker(face=self.FACE, mouth=self.FACE.centre, eyes=Point(100.0, 100.0))
+        assert not _blocks_gaze(candidate, unlooking, reach=90.0)
+        eyeless = Speaker(face=self.FACE, mouth=self.FACE.centre, gaze=Vector(0.0, 1.0))
+        assert not _blocks_gaze(candidate, eyeless, reach=90.0)
+
+
 class TestOffPanel:
     """A balloon whose speaker is not drawn is placed with what `place_script` was handed."""
 
@@ -662,3 +836,120 @@ class TestTheNearerSide:
     def test_by_where_the_balloon_went(self, centre_x: float, side: Side):
         balloon = BBox(centre_x - 20.0, 30.0, 40.0, 20.0)
         assert _nearer_side(balloon, self.PANEL) is side
+
+
+class TestTriageForFigures:
+    """Mutation triage for #71: what the placer does with bystanders and keep-outs.
+
+    Each test kills a mutant the runs on the #71 stack left alive; `docs/maintainer/testing.md`
+    names them.
+    """
+
+    PANEL = BBox(0.0, 0.0, 600.0, 400.0)
+    SQUARE = BBox(0.0, 0.0, 10.0, 10.0)
+
+    def test_two_bystanders_bodies_are_paid_for_both(self):
+        body = _square(0.0, 0.0, 10.0, 10.0)
+        assert _occlusion_cost(self.SQUARE, {}, None, [body, body]) == pytest.approx(
+            2 * W_OCCLUSION
+        )
+
+    def test_a_balloon_pays_for_a_bystanders_body(self):
+        speaker = _actor(face=Circle(500.0, 300.0, 20.0))
+        bystanders = Bystanders(bodies=(_square(0.0, 0.0, 10.0, 10.0),))
+
+        def score(others: Bystanders) -> float:
+            return _score(
+                self.SQUARE,
+                speaker=speaker,
+                speaker_id="a",
+                actors={"a": speaker},
+                hulls={},
+                panel=self.PANEL,
+                prefer=None,
+                placed=[],
+                masses=[],
+                bystanders=others,
+            )
+
+        assert score(bystanders) - score(Bystanders()) == pytest.approx(W_OCCLUSION)
+
+    def test_a_caption_pays_for_a_bystanders_body(self):
+        bystanders = Bystanders(bodies=(_square(0.0, 0.0, 10.0, 10.0),))
+
+        def score(others: Bystanders) -> float:
+            return _score_caption(
+                self.SQUARE,
+                actors={},
+                hulls={},
+                panel=self.PANEL,
+                prefer=PlacementZone.TOP_LEFT,
+                placed=[],
+                masses=[],
+                bystanders=others,
+            )
+
+        assert score(bystanders) - score(Bystanders()) == pytest.approx(W_OCCLUSION)
+
+    def test_a_line_from_off_panel_keeps_off_a_bystanders_face(self):
+        event = SayEvent(by="carol", text="Over here!", off_panel=Side.LEFT)
+        natural = place_script([event], {}, self.PANEL).balloons[0].box
+        face = Circle(natural.centre.x, natural.centre.y, 15.0)
+        moved = place_script(
+            [event], {}, self.PANEL, bystanders=[Speaker(face=face, mouth=face.centre)]
+        ).balloons[0]
+        assert not moved.box.intersects_circle(face)
+
+    def test_the_last_candidate_is_the_bottom_right_corner(self):
+        panel = BBox(10.0, 20.0, 600.0, 400.0)
+        last = _candidate_positions(_actor(), (60.0, 30.0), panel)[-1]
+        inset = 400.0 * 0.02
+        assert last == BBox(panel.right - inset - 60.0, panel.bottom - inset - 30.0, 60.0, 30.0)
+
+    def test_a_tail_nothing_clears_still_starts_on_the_balloon(self):
+        balloon = BBox(100.0, 100.0, 60.0, 30.0)
+        mouth = Point(400.0, 300.0)
+        # A face around everything: no bend clears it, so the tail falls back to straight.
+        tail = route_tail(balloon, mouth, [Circle(250.0, 200.0, 1000.0)])
+        assert tail.control is None
+        assert tail.start == _rim_point(balloon, mouth)
+        assert tail.end == mouth
+
+
+class TestASoundInAPanelOfFigures:
+    """`place_script` hands its sound effects every limit a balloon has (#71 triage)."""
+
+    PANEL = BBox(0.0, 0.0, 600.0, 400.0)
+    SOUND = SfxEvent(text="KRAK")
+
+    def _zone(self, **limits: Any) -> Polygon:
+        return place_script([self.SOUND], {}, self.PANEL, **limits).effects[0].zone
+
+    def _around(self, zone: Polygon) -> list[Point]:
+        left, top, right, bottom = zone.bounds
+        return [Point(left, top), Point(right, top), Point(right, bottom), Point(left, bottom)]
+
+    def test_it_pays_for_a_keep_out(self):
+        natural = self._zone()
+        moved = self._zone(keep_out=[self._around(natural)])
+        assert moved.intersection(natural).area < natural.area / 2
+
+    def test_it_keeps_out_from_under_an_inset(self):
+        natural = self._zone()
+        left, top, right, bottom = natural.bounds
+        moved = self._zone(exclusions=[BBox(left, top, right - left, bottom - top)])
+        assert moved.intersection(natural).area == 0
+
+    def test_it_stays_inside_a_shaped_panel(self):
+        natural = self._zone()
+        left = natural.bounds[0]
+        # The panel's outline cuts the natural footprint off.
+        inside = [(0.0, 0.0), (left + 1.0, 0.0), (left + 1.0, 400.0), (0.0, 400.0)]
+        moved = self._zone(inside=inside)
+        assert Polygon(inside).buffer(1e-6).contains(moved)
+
+    def test_it_keeps_off_a_bystanders_face(self):
+        natural = self._zone().centroid
+        face = Circle(natural.x, natural.y, 40.0)
+        moved = self._zone(bystanders=[Speaker(face=face, mouth=face.centre)])
+        assert moved.distance(ShapelyPoint(face.cx, face.cy)) >= face.r

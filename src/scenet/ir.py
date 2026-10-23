@@ -21,12 +21,15 @@ from pydantic import (
     ConfigDict,
     Discriminator,
     Field,
+    ModelWrapValidatorHandler,
     Tag,
+    ValidationError,
     ValidationInfo,
     field_validator,
     model_validator,
 )
 from pydantic.json_schema import SkipJsonSchema
+from pydantic_core import InitErrorDetails
 
 from scenet.emphasis import EmphasisError, parse
 from scenet.errors import RuleViolationError
@@ -42,6 +45,7 @@ __all__ = [
     "CastMember",
     "Column",
     "Corner",
+    "Direction",
     "Face",
     "Facing",
     "Fit",
@@ -305,6 +309,25 @@ class PlacementZone(StrEnum):
         across = {"left": 0.25, "center": 0.5, "right": 0.75}[horizontal]
         down = {"top": 0.2, "middle": 0.5, "bottom": 0.8}[vertical]
         return across, down
+
+
+class Direction(StrEnum):
+    """Which way a comic is read: its progression, not the direction of its text.
+
+    `ltr` reads from the top left, as Western comics do; `rtl` from the top right, as manga
+    do -- the panels on a page and in a strip, the pages side by side, and the balloons and
+    captions in a panel. The words in a balloon are not touched: a manga translated into
+    English still reads right to left while each line reads left to right.
+
+    It is the whole document's, written once, as EPUB's `page-progression-direction` is per
+    book, whose words these are. Only what reading decides follows it. The scene is never
+    mirrored: figures, gaze, staging, tails and sound effects stay as staged, and every
+    word that names a place on the panel -- `at:`, `left_of`, `facing:`, `prefer:`, a side
+    for `off_panel`, an inset's corner -- means the same place either way.
+    """
+
+    LTR = "ltr"
+    RTL = "rtl"
 
 
 class Facing(StrEnum):
@@ -896,11 +919,12 @@ class SettingSpec(Strict):
 
 
 class CastMember(Strict):
-    """One character present in the panel.
+    """One character present in the panel: a puppet Scenet poses, or a figure a picture draws.
 
     Attributes:
         reference: Name of a puppet in the library. This is what gets drawn; the key
             this member is filed under in `cast` is the actor id used everywhere else.
+            None for a figure.
         pose: Named pose from that puppet's declared set.
         expression: Named expression from that puppet's declared set. Selected by name
             exactly as a pose is, because a face is the same kind of thing as a body:
@@ -911,6 +935,10 @@ class CastMember(Strict):
             changes the output.
         at: Preferred horizontal anchor.
         facing: Which way the figure is turned.
+        figure: Instead of `reference`: a figure the panel's supplied picture draws, by
+            the name its artwork contract gives it (#71). Nobody poses or places it --
+            the artist did -- so none of the keys above applies to it, and every one
+            is refused beside it.
 
     The split between actor id and `reference` is what lets one puppet appear twice in
     a panel as two different people:
@@ -920,12 +948,44 @@ class CastMember(Strict):
           guard_right: {reference: bob, pose: standing_neutral, facing: left}
     """
 
-    reference: str
+    reference: str | None = None
     pose: str = "standing_neutral"
     expression: str = "neutral"
     marks: tuple[Mark, ...] = ()
     at: AnchorX = AnchorX.CENTRE
     facing: Facing = Facing.RIGHT
+    figure: SvgText | None = None
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def names_a_puppet_or_a_figure(
+        cls, data: object, handler: ModelWrapValidatorHandler["CastMember"]
+    ) -> "CastMember":
+        """Require one of `reference` and `figure`, reported as `reference` missing.
+
+        Both are optional to the model, so pydantic alone would accept a member that
+        names neither. Saying so as `reference` being missing -- pydantic's own error, at
+        the place it always was -- keeps every finding a puppet's member gave before
+        figures existed exactly as it was, and lets a misspelt `referecne` still be
+        folded into "did you mean 'reference'?".
+        """
+        if not isinstance(data, dict) or any(
+            data.get(key) is not None for key in ("reference", "figure")
+        ):
+            return handler(data)
+        missing: InitErrorDetails = {"type": "missing", "loc": ("reference",), "input": data}
+        try:
+            handler(data)
+        except ValidationError as exc:
+            raise ValidationError.from_exception_data(
+                cls.__name__, [missing, *_init_details(exc)]
+            ) from None
+        raise ValidationError.from_exception_data(cls.__name__, [missing])
+
+    @property
+    def is_figure(self) -> bool:
+        """Whether this member is a figure a picture draws, rather than a puppet."""
+        return self.figure is not None
 
     @field_validator("marks")
     @classmethod
@@ -943,6 +1003,25 @@ class CastMember(Strict):
         if repeated:
             raise ValueError(f"mark listed more than once: {', '.join(repeated)}")
         return tuple(sorted(marks))
+
+
+def _init_details(error: ValidationError) -> list[InitErrorDetails]:
+    """A validation error's details, in the form a new one is built from."""
+    details: list[InitErrorDetails] = []
+    for item in error.errors():
+        detail: InitErrorDetails = {
+            "type": item["type"],
+            "loc": item["loc"],
+            "input": item["input"],
+        }
+        if "ctx" in item:
+            detail["ctx"] = item["ctx"]
+        details.append(detail)
+    return details
+
+
+#: What a puppet's member may say that a figure's may not: posing and placing it.
+PUPPET_KEYS: tuple[str, ...] = ("pose", "expression", "marks", "at", "facing")
 
 
 class Relation(Strict):
@@ -1049,8 +1128,9 @@ class CaptionEvent(Strict):
         kind: What the box is doing, which decides how it is set.
         tone: What the box is filled with. Defaults to `paper`, the white every caption
             has been since captions shipped, so no existing panel moves.
-        prefer: Where it would like to sit. Defaults to `top_left`, which is where a
-            `locale` caption conventionally goes.
+        prefer: Where it would like to sit, a place on the panel. Unwritten, it is
+            `None`, and the caption sits where a `locale` caption conventionally goes:
+            where reading starts, `top_left`, or `top_right` in a comic read right to left.
         by: Who is speaking, for a `spoken` caption only.
 
     **A caption is not a fifth balloon kind.** It has no speaker to point at and no
@@ -1071,7 +1151,7 @@ class CaptionEvent(Strict):
     text: LetteredText = Field(min_length=1)
     kind: CaptionKind = CaptionKind.LOCALE
     tone: CaptionTone = CaptionTone.PAPER
-    prefer: PlacementZone = PlacementZone.TOP_LEFT
+    prefer: PlacementZone | None = None
     by: SvgText | None = None
 
     @field_validator("by")
@@ -1227,6 +1307,8 @@ class PanelIR(Strict):
         description: What the panel shows, in words, for a reader who cannot see it: the
             author's, or a comic script's prose. Carried and never interpreted -- nothing
             is drawn from it. Without one, accessible output says what the panel holds.
+        direction: Which way the comic is read. The whole document's: a scene's panels and
+            a comic script's take it from the document, and none may write its own.
 
     Validation is strict and total: unknown keys are rejected, every actor id mentioned
     in `staging` or `script` must exist in `cast`, and the ordering relations must not
@@ -1258,6 +1340,15 @@ class PanelIR(Strict):
             "the SVG as its accessible name and never interpreted. Not inherited: a panel "
             "drawn `over:` another is a different picture. Left out, one is generated from "
             "the shot, the setting and the cast."
+        ),
+    )
+    direction: Direction = Field(
+        default=Direction.LTR,
+        description=(
+            "Which way the comic is read: `ltr` from the top left, `rtl` from the top right, "
+            "as manga are -- panels, pages and the balloons in a panel. Its progression, not "
+            "its text: the words in a balloon still read left to right. Written once for the "
+            "whole document; the scene is never mirrored."
         ),
     )
 
@@ -1380,6 +1471,102 @@ class PanelIR(Strict):
                     if colour[neighbour] == _UNVISITED:
                         stack.append((neighbour, False))
         return self
+
+    @model_validator(mode="after")
+    def check_figures(self) -> Self:
+        """A figure a picture draws is not posed, placed or staged, and plays one part.
+
+        The frontend refuses a puppet's key written beside `figure`, since a written
+        default and an absent key look the same here; this is the backstop for an IR
+        built in Python, and the place the rest is decided:
+
+        - a cast is all puppets or all figures (`conflicting-cast`): staging and the
+          camera place puppets, and would place them over painted faces they cannot see;
+        - one figure plays one part (`conflicting-cast`);
+        - no staging relation names a figure (`figure-staging`): the artist staged them.
+        """
+        figures = self.figures()
+        if not figures:
+            return self
+        for actor, member in self.cast.items():
+            if not member.is_figure:
+                continue
+            if member.reference is not None:
+                raise RuleViolationError(
+                    f"cast member {actor!r} names a puppet and a figure the picture draws; it "
+                    "is one or the other. Over an inherited member, write `reference: null`",
+                    rule="conflicting-cast",
+                    loc=("cast", actor, "reference"),
+                )
+            for key in PUPPET_KEYS:
+                if getattr(member, key) != CastMember.model_fields[key].default:
+                    raise RuleViolationError(
+                        f"cast member {actor!r} is a figure the picture draws, which nobody "
+                        f"poses or places, so {key!r} does not apply to it",
+                        rule="conflicting-cast",
+                        loc=("cast", actor, key),
+                    )
+        puppets = [actor for actor, member in self.cast.items() if not member.is_figure]
+        if puppets:
+            raise RuleViolationError(
+                f"the cast mixes puppets ({', '.join(puppets)}) with figures the picture draws "
+                f"({', '.join(figures)}); a panel's cast is all one or all the other, since "
+                "staging would place a puppet over a painted face it cannot see",
+                rule="conflicting-cast",
+                loc=("cast", puppets[0], "reference"),
+            )
+        played: dict[str, str] = {}
+        for actor, figure in figures.items():
+            if figure in played:
+                raise RuleViolationError(
+                    f"figure {figure!r} is played by {played[figure]!r} already; one figure "
+                    "the picture draws is one person",
+                    rule="conflicting-cast",
+                    loc=("cast", actor, "figure"),
+                )
+            played[figure] = actor
+        for index, relation in enumerate(self.staging):
+            named = next(
+                (actor for actor in (relation.subject, relation.object) if actor in figures),
+                None,
+            )
+            if named is not None:
+                raise RuleViolationError(
+                    f"staging relation '{relation.predicate}' names {named!r}, a figure the "
+                    "picture draws: the artist already placed and staged everyone in it",
+                    rule="figure-staging",
+                    loc=("staging", index),
+                )
+        return self
+
+    def figures(self) -> dict[str, str]:
+        """The cast members a supplied picture draws, and the figure each plays.
+
+        Example:
+            >>> from scenet import parse_panel
+            >>> parse_panel("cast: {ana: {figure: ana_in_red}}").figures()
+            {'ana': 'ana_in_red'}
+        """
+        return {
+            actor: member.figure for actor, member in self.cast.items() if member.figure is not None
+        }
+
+    def puppets(self) -> dict[str, str]:
+        """The cast members Scenet poses, and the puppet each is drawn by."""
+        return {
+            actor: member.reference
+            for actor, member in self.cast.items()
+            if member.reference is not None
+        }
+
+    @property
+    def drawn_by_its_picture(self) -> bool:
+        """Whether everybody in the cast is a figure the panel's picture draws.
+
+        Then nothing is staged, the camera does not run, and the shot is whatever the
+        artist drew.
+        """
+        return bool(self.cast) and all(member.is_figure for member in self.cast.values())
 
     def ordering_constraints(self) -> tuple[tuple[str, str], ...]:
         """Normalised (left, right) pairs from both left_of and right_of relations."""
@@ -1610,7 +1797,7 @@ class Column(Strict):
 
 
 class Tier(Strict):
-    """A row of panels read left to right, or of columns each read top to bottom.
+    """A row of panels read in turn, or of columns each read top to bottom.
 
     Columns are how a tall panel beside a stack of short ones is written. The stack is
     read down before the page is read across, which is what readers do when a panel
@@ -1622,8 +1809,10 @@ class Tier(Strict):
 
     Attributes:
         height: Its share of the page's height, relative to the other tiers.
-        panels: The panels in it, in reading order.
-        columns: The columns in it, left to right. A tier has `panels` or `columns`.
+        panels: The panels in it, in reading order: left to right, or right to left for a
+            document read that way.
+        columns: The columns in it, in reading order, as `panels` are. A tier has `panels`
+            or `columns`.
         slant: How far the gutters between its panels lean from upright, in degrees,
             from -30 to 30. Positive leans the top of each gutter to the right.
     """
@@ -1685,8 +1874,9 @@ class Tier(Strict):
 class PageSpec(Strict):
     """One page: tiers, top to bottom.
 
-    A page is read tier by tier, left to right within a tier and down each column of a
-    tier of columns, so the order panels are written in is the order they are read in.
+    A page is read tier by tier, left to right within a tier -- right to left, for a
+    document whose `direction` is `rtl` -- and down each column of a tier of columns, so the
+    order panels are written in is the order they are read in.
     That is the page's version of the rule a balloon obeys, and it holds by construction:
     columns that readers would not read down are refused by
     :class:`PageLayout <scenet.ir.PageLayout>`.

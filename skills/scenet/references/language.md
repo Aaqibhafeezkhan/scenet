@@ -300,7 +300,8 @@ to: a picture's values are the artist's.
 
 **Nothing else moves.** The picture costs a balloon nothing. The compiler does not know what is in
 it, so a balloon may sit anywhere on it; the cast's faces are what lettering keeps clear of. The
-camera frames the cast exactly as it would in front of masses.
+camera frames the cast exactly as it would in front of masses. When the people are in the picture,
+its artwork contract says where — see [Figures the picture draws](#figures-the-picture-draws).
 
 **Linked or embedded.** The SVG names the picture by the path exactly as written, percent-encoded,
 so it is found when the SVG sits beside the document — which is where `scenet build` writes it.
@@ -315,6 +316,66 @@ accessible name and has no title of its own. A generated description names neith
 the hour over a picture — the compiler has not seen it — only the weather it drew. Write
 `description:` to say what the picture shows.
 
+### Figures the picture draws
+
+A picture can draw its own people. Cast them with `figure:` in place of `reference:`, and Scenet
+letters them as it letters puppets — balloons in reading order, never over a face, tails to the
+mouth — while drawing nothing of them: the picture already has.
+
+```yaml
+setting: {image: art/p01-street.png}
+cast:
+  ana: {figure: ana}          # in place of reference:
+  ben: {figure: ben}
+script:
+  - say: {by: ana, text: "Where are we?"}
+  - say: {by: ben, text: "Somewhere they won't look."}
+```
+
+Where each face, mouth and body is, the panel does not say — it never writes a coordinate. The
+picture's [artwork contract](https://creatoan.github.io/scenet/reference/asset_contract.html#artwork-contracts) does: a file beside the picture,
+named after it, `art/p01-street.art.yaml`, measured once in the picture's own pixels and
+committed with it. `figure:` names a figure it declares. The contract is read only for a panel
+whose cast names a figure, and its geometry goes through the picture's `fit`, so a face is
+excluded exactly where the picture draws it, under `cover` and `contain` alike.
+
+**Everybody the contract declares is in the picture.** A face nobody cast is as forbidden to
+lettering as a speaker's, and a body as costly to cover: a crowd of five can be declared and two of
+them cast. The other way round, a cast figure the panel's picture does not draw is simply not in
+that panel — as a member written `(OP)` is not — so a script's front matter or a scene's defaults
+can cast every figure of a chapter, and each panel holds those its own picture draws. A line spoken
+there by one it does not draw is `unknown-figure`, listing who the picture does draw; that is where
+a misspelt name is caught. A figure in a panel with no picture is `unknown-figure` too.
+
+**What does not apply.** The artist already framed, posed and staged everybody in the picture:
+
+- **No camera.** The shot is whatever the picture shows. `camera:` on a panel whose cast is all
+  figures is refused, as `figure-staging`, a key with no effect; a panel that inherits one writes
+  `camera: null`. A generated description says no shot.
+- **No staging.** A relation naming a figure — `left_of`, `looking_at` and the rest — is refused,
+  as `figure-staging`.
+- **No posing.** `pose`, `expression`, `marks`, `at` and `facing` are a puppet's, and refused beside
+  `figure`, as is `reference`: a member is one or the other (`conflicting-cast`). A member inherited
+  as a puppet becomes a figure with `reference: null` beside its `figure`.
+- **No gaze.** A contract declares none, so nothing keeps a balloon out of a figure's line of sight.
+- **No mixed casts.** A cast is all puppets or all figures (`conflicting-cast`): staging and the
+  camera would place a puppet over a painted face they cannot see. One figure is one person, played
+  by one member.
+
+**Keep-out regions** in the contract are ground lettering pays to cover, weighted as emanata are —
+a sign, a hand, what the panel is about — and never forbidden: a crowded panel covers one before it
+fails.
+
+**A `cover` crop** can push a face or a mouth out of the panel. Lettering stays inside the panel as
+always, and a face is kept clear for whatever part of it is in view. A tail to a mouth cropped
+away ends on the frame, aimed at it, and `scenet build` says so in a note; `fit: contain` shows the
+whole picture.
+
+`scenet check` reads the contract without running the solver, and reports a missing or malformed one
+as `artwork-contract`: in the contract itself, at the line of the fault, when the document is checked
+as a file; at the line naming the picture when it is checked as text, as in the playground or over
+MCP. The debug overlay (`scenet build --debug`) draws every face, mouth, body and keep-out over the
+panel, which is how a contract is checked against its picture.
 
 ## `cast`
 
@@ -323,6 +384,7 @@ A mapping of actor id to properties. Ids are chosen by the author and referenced
 | Key | Type | Meaning |
 |---|---|---|
 | `reference` | asset name | Which puppet to pull from the library |
+| `figure` | figure name | Instead of `reference`: a figure the panel's picture draws, as its [artwork contract](https://creatoan.github.io/scenet/reference/asset_contract.html#artwork-contracts) names it. See [Figures the picture draws](#figures-the-picture-draws) |
 | `pose` | pose name | A named joint configuration declared by that puppet |
 | `expression` | expression name | A named face declared by that puppet |
 | `marks` | list of marks | Emanata drawn around the character: `plewds`, `squeans`, `grawlixes`, `briffits` |
@@ -385,6 +447,9 @@ have been drawn, and a character too small to have a face has no marks at all. S
 
 An oath written in a balloon — `"@#$%!"` — is dialogue, and already works. `grawlixes` is the other
 convention, the symbols over a head.
+
+A cast member may instead be a figure the panel's picture draws, written `figure:`; see
+[Figures the picture draws](#figures-the-picture-draws) for what applies to it and what does not.
 
 `reference`, `pose` and `expression` are validated against the puppet library, not just against the
 language's own grammar — a misspelled pose is a perfectly good string as far as the grammar is
@@ -470,7 +535,8 @@ script:
 A speaker who is not drawn has no mouth to point at, so their balloon's tail ends on the frame,
 on their side — Blambot: "the tail of the balloon generally butts against the panel border". Name
 the side, or write `off_panel: true` and the compiler takes the nearer of left and right to where it
-put the balloon. Top and bottom are only ever named: balloons sit high, so "the nearest edge" would
+put the balloon — which it puts high on the side reading starts from, top left, or top right in a
+comic read right to left. A side you name is a side of the panel, whichever way it is read. Top and bottom are only ever named: balloons sit high, so "the nearest edge" would
 aim most tails at the top border, which reads as a speaker above.
 
 An off-panel speaker is somebody nobody draws, so `by` is any name and must **not** be in the
@@ -509,7 +575,7 @@ to do. Comics solved this long before they had reliable backgrounds.
 | `text` | string | What the box says. Line breaking is computed, as for dialogue |
 | `kind` | `locale`, `monologue`, `spoken`, `editorial` | What the box is doing |
 | `tone` | `paper`, `pale`, `ink` | What the box is filled with. Defaults to `paper` |
-| `prefer` | zone | Where it would like to sit. Defaults to `top_left` |
+| `prefer` | zone | Where it would like to sit. Unwritten, where reading starts: `top_left`, or `top_right` read right to left |
 | `by` | any name | Who is speaking, for a `spoken` caption only |
 
 The four kinds are the letterers' own vocabulary, taken from Blambot's *Comic Book Grammar &
@@ -576,7 +642,8 @@ the first non-neutral value in the codebase, and there is no colour policy to pu
 **Text is set flush left.** This is a *convention*, not a rule the way reading order is: the
 lettering references describe left alignment as the norm while calling it a house preference. It is
 the default because it is what letterers do, and it is recorded here as a choice rather than a law —
-unlike `shot_types.md`, which is normative. Balloons, by contrast, centre their text.
+unlike `shot_types.md`, which is normative. Balloons, by contrast, centre their text. Both hold
+in a comic read right to left: its text still reads left to right.
 
 Captions are placed by the same machinery as balloons — the same face avoidance, the same silhouette
 occlusion cost, the same hard reading-order rule — because the placement principles for floating
@@ -667,7 +734,8 @@ exclamations, and no emphasis — an underscore here is just an underscore.
 ### Reading order is enforced, not suggested
 
 Balloons and captions are placed in script order, in one pass, and a box may never sit
-above-and-left of the one before it. Violating this is not a cosmetic flaw: it makes the panel read
+above-and-left of the one before it — above-and-*right*, in a comic read right to left (see
+[`direction`](#direction)). Violating this is not a cosmetic flaw: it makes the panel read
 in the wrong order, which is a correctness bug in a comic. The constraint is therefore hard, and a
 panel whose boxes cannot be placed without breaking it is rejected rather than rendered wrongly.
 
@@ -676,7 +744,8 @@ written between two lines of dialogue is read between them; one written last is 
 
 A sound effect takes its number in the same sequence — which is the order a reader of the text, or a
 screen reader, follows — but is exempt from the geometric rule. A sound sits where the sound is, and
-holding it to above-and-left would make many panels impossible to letter.
+holding it to above-and-left would make many panels impossible to letter. Read right to left, it
+stays exempt, and stays where it was: a sound is part of the picture, which is not mirrored.
 
 That sequence is what a screen reader hears. Every SVG names each panel with its
 [description](#description) and then every balloon, caption and sound effect in this order —
@@ -793,11 +862,61 @@ forms and the contextual substitution that picks one, which only a full text sha
 Scenet applies no glyph substitution at all, so a face that picks its crossbar "I" contextually will
 not pick it here either. Write in capitals if you want them.
 
+## `direction`
+
+Which way the comic is read: `ltr`, from the top left, as Western comics are, or `rtl`, from the
+top right, as manga are. It is the comic's **progression**, not the direction of its text: a manga
+translated into English still reads right to left, while the words in each balloon read left to
+right. Vertical Japanese lettering is not part of it.
+
+```yaml
+direction: rtl
+cast:
+  hana: {reference: alice, at: right_third, facing: left}
+  ken: {reference: bob, at: left_third}
+script:
+  - say: {by: hana, text: You came.}
+  - say: {by: ken, text: You called.}
+```
+
+| Key | Means | Default |
+|---|---|---|
+| `direction` | `ltr` or `rtl` | `ltr` |
+
+The words are EPUB's, whose `page-progression-direction` says the same thing about a book. Like
+EPUB's, it is said **once, for the whole document**: at the top of a single panel, beside
+`panels:` in a scene, where every panel inherits it, or in a comic script's front matter. A panel
+may not have one of its own — a page read one way holding a panel read the other has no order a
+reader could follow — so a panel under `panels:` that writes `direction`, even the document's
+own, and a script's `@direction:` are reported as `panel-direction`.
+
+Only what reading decides follows it. **The scene is never mirrored**: figures, gaze, staging, the
+camera, tails and sound effects stay exactly as staged, and every word that names a place on the
+panel means the same place either way — `at:`, `left_of`, `facing:`, `prefer:`, a side for
+`off_panel`, an inset's corner. Panel Core and Page Core record `direction` when it is `rtl`.
+
+What follows it, in a panel:
+
+- **[Reading order](#reading-order-is-enforced-not-suggested)**: a box may never sit above and
+  *right* of one before it.
+- **Where an unplaced box would rather start**: a caption with no `prefer`, and a voice from
+  [off panel](#off-panel-speech) with no side named, go top right — where reading starts.
+- **Every tiebreak reading decides.** When two places cost exactly the same, the one tried first
+  wins, and right to left they are tried in the mirrored order. So the mirror image of a panel,
+  read right to left, is lettered as the exact mirror of the original read left to right.
+- **The description** names the cast in reading order, from the right; "left" and "right" still
+  say where each one stands.
+
+And on a [page](#page-and-pages): each tier's panels from the right, the pages of a document side
+by side from the right, and a strip from the right — each still written in reading order, the
+order a screen reader follows.
+
 ## `page` and `pages`
 
 A scene can lay its panels out on pages. `pages:` is a list of pages; each page is a list of
-**tiers**, top to bottom; each tier is a list of panels, left to right. `page:` is the format they
-share.
+**tiers**, top to bottom; each tier is a list of panels, in reading order — left to right, or right
+to left for a comic read that way. `page:` is the
+format they share.
 
 A comic script's pages are its `PAGE` headings instead; its front matter takes `page:` but
 not `pages:`. See [Write a panel as a comic script](https://creatoan.github.io/scenet/howto/write_a_comic_script.html#pages).
@@ -909,8 +1028,18 @@ both `panels` and `columns` or neither, two stacks side by side, two insets that
 too big for its panel, a slant that cannot apply or is too steep, or margins and gutters that leave
 no room are reported as `page-layout`.
 
-Not yet: frames of any other shape, such as round panels or ones without borders; right-to-left
-reading ([#68](https://github.com/creatoan/scenet/issues/68)), comic-script `PAGE` headings as pages
+**Read right to left.** With [`direction: rtl`](#direction), the same page is read from the top
+right. Panels are still written in reading order, so the first panel of a tier is at its right and
+the last at its left; the first column of a tier of columns is at the right, and each column is
+still read top to bottom — a stack beside a tall panel is read down before across, on the right.
+Each frame is exactly the one a left-to-right page gives that panel with the tier written the other
+way round, so every panel keeps its size, and its art is the art it has read left to right. What
+names a place on the page keeps naming it: an inset's `at:` is a corner of its parent, and a
+positive `slant` leans the top of each gutter right, as written. A layout one direction refuses, the
+other refuses too.
+
+Not yet: frames of any other shape, such as round panels or ones without borders; comic-script
+`PAGE` headings as pages
 ([#75](https://github.com/creatoan/scenet/issues/75)), and print sizes with trim and bleed
 ([#80](https://github.com/creatoan/scenet/issues/80)).
 

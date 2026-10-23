@@ -25,6 +25,19 @@ below 1.0 means.
   `label`.** Nothing else in it moves, and `format_version` stays 1: a Core without them is
   still valid and writes back byte for byte, but golden Core files of your own will need
   regenerating once. 0.11 refuses the new keys.
+- **A balloon over its own speaker's body costs what it always should have** when the actor id
+  is not the puppet's name (`ALICE: {reference: alice}`, `carol: {reference: alice}`). Such a
+  speaker was charged as a bystander, so balloons drifted away from them. Three gallery
+  panels letter differently, each balloon now beside its speaker: regenerate golden Cores of
+  your own that cast an actor under another name.
+- **`CaptionEvent.prefer` is `None` when it was not written**, where it used to read `top_left`:
+  an unwritten zone is where reading starts, which the solver decides from `direction`. A caption
+  is placed exactly where it was. Code reading it from the Python API takes `None` as `top_left`
+  for a left-to-right panel.
+- **`CastMember.reference` may be `None`**, for a member that is a figure a picture draws, and
+  `CompileResult.camera` is `None` for a panel whose cast is all figures. Code reading either
+  from the Python API narrows them first; `PanelIR.puppets()` gives every puppet's reference.
+  A member that names neither a puppet nor a figure is reported exactly as before.
 - **Every SVG's bytes change once**, to carry what a screen reader reads: a `role` and a `<title>`
   per panel, and `aria-hidden` on a page's own shapes. Nothing is drawn
   differently and lettering stays outlines. `--no-aria` (`aria=False`) gives back exactly the
@@ -32,8 +45,25 @@ below 1.0 means.
 
 ### Added
 
-- **`scenet build --watch`** rebuilds when the source or compilation dependencies change, with debounced saves and recovery after failed builds.
-
+- **`direction: ltr | rtl`, which way a comic is read** (#68): `rtl` for manga, read from the
+  top right. It is the comic's progression, not its text's, and EPUB's word for it. Written once
+  for the whole document — at the top of a panel, beside `panels:`, or in a comic script's front
+  matter — and inherited by every panel; a panel's own, and a script's `@direction:`, are the new
+  rule `panel-direction`. The editor's schema offers it. Panel Core and Page Core record it when it
+  is `rtl`; a left-to-right Core is byte-identical and `format_version` stays 1.
+- **A panel read right to left is lettered from the top right.** A balloon or caption may never sit
+  above and right of one before it; a caption with no `prefer`, and a voice from off panel with no
+  side named, start top right; every tiebreak between equal placements is mirrored, so the mirror
+  image of a panel is lettered as the exact mirror of the original; and a generated description
+  names the cast from the right. Nothing in the picture moves: figures, gaze, tails and sound
+  effects are byte-identical, and `prefer:`, `at:` and named sides keep meaning places on the panel.
+  The debug overlay says "read right to left".
+- **Pages and strips read right to left.** Under `direction: rtl` a tier's first panel, or first
+  column, is at its right; each frame is the one the tier reversed would have, so every panel
+  keeps its size and its art, an inset keeps its corner and a slant leans as written. The pages of
+  a document side by side (`render_pages`, the playground) and a strip start at the right, and every
+  one is still written in reading order. A strip or a row of pages read two ways is refused.
+- **Two gallery pages**, the same manga page read right to left and left to right.
 - **`setting: {image: ..., fit: cover | contain}`**: a picture drawn elsewhere, behind the
   cast (#70). It is a backdrop of its own, so it is written instead of a `place` or
   `masses`, never beside them or beside a `horizon` (`conflicting-setting`); a `fit` with
@@ -65,6 +95,36 @@ below 1.0 means.
 - **The playground's Image… button** adds a `.png` or `.jpg` to the document's `art/` folder,
   for as long as the tab is open, and the preview and every download embed it. The VS Code
   preview embeds pictures too, since it is not drawn beside the document.
+- **An artwork contract** declares the figures a supplied picture draws (#71): beside
+  `art/p01.png`, `art/p01.art.yaml` gives each figure's `face` (a disc lettering may not
+  cover), `mouth` (where a tail ends) and `body`, and `keep_out` regions lettering should stay
+  off, all in the picture's own pixels, with the `size` they were measured on.
+  `scenet schema --artwork` emits its JSON Schema, which the VS Code extension associates with
+  `*.art.yaml` and the documentation site publishes beside the others. Panel Core records what a
+  contract declares, mapped into the panel through the picture's fit: `figures`, beside
+  `actors`, and the picture's `keep_out`. Both are left out when empty, so every Core reads and
+  writes as before and `format_version` stays 1; the debug overlay draws each figure's face,
+  mouth and body, and each keep-out.
+- **Figures a picture draws, in the cast** (#71): `cast: {ana: {figure: ana}}` in place of
+  `reference:`. The panel's picture's artwork contract says where each face, mouth and body is,
+  and lettering is placed by the same rules as around a puppet: never over a declared face —
+  anybody's in the picture, cast or not — tails aimed at the mouth, bodies and keep-out regions a
+  cost. The camera and staging do not run. A cast figure a panel's picture does not draw is not in
+  that panel. Four new rules, each from the cheap pass: `unknown-figure`, `artwork-contract`
+  (reported in the contract when the document is checked as a file), `conflicting-cast` (a puppet
+  and a figure at once, a puppet's key on a figure, a mixed cast, one figure played twice) and
+  `figure-staging` (staging naming a figure, a camera over figures). A `cover` crop that cuts a
+  speaking figure's mouth out of the panel ends its tail on the frame, with a note. `scenet check`
+  and `build` refuse a `*.art.yaml` given as a document. The panel and scene schemas accept
+  `figure`.
+- **A gallery example of figures a picture draws**, `35-figures.scene.yaml`: a station
+  platform painted by `scripts/make_gallery_figures.py`, with its artwork contract written from
+  the same constants, lettered under `cover` and `contain`. Two of its three people are cast,
+  the third is kept clear of all the same, and its timetable board is a keep-out.
+- **Contracts travel with their picture.** The playground's Image… button adds a picture's
+  `.art.yaml` beside it, cleaned to the same name so the two pair; the MCP server takes it in
+  `files`, its instructions and `get_spec`'s characters part say so, and the spec pack prints
+  the gallery's contract. Still five tools. A how-to, *Letter the people in your own art*.
 - **A panel's `description`**: what it shows, in words, for a reader who cannot see it.
   Written as `description:` in YAML; in a comic script, the panel's prose is it — its lines
   one paragraph, Markdown's markers taken off — unless an `@description:` directive, kept
@@ -101,6 +161,11 @@ below 1.0 means.
 
 ### Fixed
 
+- **A speaker is forgiven a balloon over their own body whatever the actor is called.** The
+  placer half-weights the speaker's silhouette, and looked the speaker up by the puppet's name
+  while the silhouettes are keyed by actor id. An actor called anything but its puppet, which
+  every comic script's capitals are, was charged as a bystander: in the gallery's comic script
+  a line moved to the far corner of the panel behind a tail bent outside it.
 - **A font path with a backslash is refused on every system**, as `font-file`. Windows read
   `fonts\Comic.ttf` as a folder and a file, and every other system as one file name, so the same
   document lettered in its font on one machine and was refused on the next. Write `/` between

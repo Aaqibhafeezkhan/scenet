@@ -20,6 +20,7 @@ from scenet import (
     CameraAngle,
     CaptionKind,
     CaptionTone,
+    Direction,
     Fit,
     Horizon,
     Mark,
@@ -164,6 +165,12 @@ class TestTheGalleryCoversTheLanguage:
         missing = [name for name in names if name not in text]
         assert missing == []
 
+    def test_every_direction_appears(self):
+        """A page read right to left has been looked at beside its left-to-right twin."""
+        text = self._all_text()
+        missing = [value.value for value in Direction if f"direction: {value.value}" not in text]
+        assert missing == []
+
     def test_every_type_size_appears(self):
         """Small type is read at the size it is lettered, so it has been looked at."""
         text = self._all_text()
@@ -258,3 +265,20 @@ class TestTheGalleryCoversTheLanguage:
         results = compile_document(GALLERY / "10-crowd-pullback.panel.yaml")
         notes = [note for result in results.values() for note in result.notes]
         assert any("camera retreated" in note for note in notes)
+
+
+class TestFiguresAPictureDraws:
+    """The gallery shows a cast the picture draws (#71), and it is what it claims to be."""
+
+    def test_a_figure_appears(self):
+        assert "figure:" in TestTheGalleryCoversTheLanguage._all_text()
+
+    def test_the_example_letters_figures_over_its_picture(self):
+        for panel, result in compile_document(GALLERY / "35-figures.scene.yaml").items():
+            core = result.core
+            assert core.actors == (), panel
+            assert {figure.actor for figure in core.figures} == {"ana", "ben", None}, panel
+            assert core.backdrop is not None, panel
+            assert core.backdrop.image is not None, panel
+            assert core.backdrop.image.keep_out, panel
+            assert result.camera is None, panel

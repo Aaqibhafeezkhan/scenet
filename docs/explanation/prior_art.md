@@ -111,9 +111,15 @@ and immediately usable: **vectors** — the lines of sight and action along whic
 travels.
 
 Taken: gaze is a real geometric quantity, so it becomes a term in the balloon cost function.
-Balloons are drawn toward the gaze direction and penalised for blocking it. The left-to-right
-"given to new" reading also serves as a tiebreaker when a script does not specify staging order. The
-rest — ideal/real verticality, modality — belongs to the deferred style layer.
+Balloons are drawn toward the gaze direction and penalised for blocking it. The rest — ideal/real
+verticality, modality — belongs to the deferred style layer.
+
+Not taken: **"given to new"** as a staging tiebreaker. This page used to say it broke ties when a
+script does not say who stands where, but no code ever did. Staging breaks a tie by the `at:`
+anchor and then by actor id, a fact about the picture. "Given to new" is a left-to-right reading,
+stated for Western layouts, and a right-to-left reading would put the given on the right. So it
+cannot be a rule about the picture, which `direction: rtl` never mirrors, and Scenet uses it in
+neither direction.
 
 ### Cassowary constraint solving
 
@@ -407,6 +413,51 @@ so a slanted tier does the same rather than keeping the horizontal gap, which wo
 gutter as it leaned.
 
 (accessible-svg)=
+### Right-to-left reading — manga, EPUB and the mirror
+
+[Cohn, *Navigating Comics*](https://doi.org/10.3389/fpsyg.2013.00186) (2013) ·
+[Cohn, Hacımusaoğlu & Klomberg, *Fluency modulates ordering of visual narrative layouts*](https://escholarship.org/uc/item/7fk966br)
+(CogSci 2022) ·
+[Cohn, Atilla, Lichtenberg & Cardoso, *The influence of writing systems on comics layouts*](https://doi.org/10.1016/j.cognition.2025.106136)
+(*Cognition* 260, 2025) ·
+[EPUB 3.3 §5.7.1, `page-progression-direction`](https://www.w3.org/TR/epub-33/#sec-spine-elem) ·
+[Kavita's notes on ComicInfo's `Manga`](https://wiki.kavitareader.com/guides/metadata/comics/)
+
+Manga are read from the top right: the pages, the panels on a page and the balloons in a panel all
+run right to left, then down. Cohn ties the convention to writing systems. Japanese text runs in
+vertical columns, read top to bottom and right to left. A corpus of 1,030 comics from 144 countries
+found that a writing system's direction shapes how its comics' pages are read. Manga go further
+than writing direction alone predicts, with more right-to-left, downward paths and more vertical
+columns. And readers of manga prefer to order panels downward, across every layout tested.
+
+Taken: **progression, not text.** EPUB's `page-progression-direction` and Kavita's notes both
+separate the direction a book is read in from the direction its text runs in. A manga translated
+into English still progresses right to left while each balloon's words read left to right.
+`direction: ltr | rtl` is EPUB's word and EPUB's values, and like EPUB's it is the book's, said
+once. Vertical Japanese lettering would need a Japanese face, vertical metrics and other line
+breaking, and is not part of it.
+
+Taken: **the mirror, for reading only.** What reading decides is mirrored, and what the picture
+decides is not:
+- the order rule, every tiebreak between equal placements, where an unplaced box starts, and panel
+  and page order are mirrored;
+- figures, gaze, tails, sound effects and the lean of a slanted gutter are not.
+
+The test is exact. The mirror image of a panel, read right to left, is lettered as the mirror of
+the original. Compiling and then mirroring the output was rejected: it would turn a character
+facing right to face left.
+
+An assumption, stated as one: the column rule mirrored. Cohn's *blockage* result, that a tall
+panel beside a stack sends readers down the stack first, was measured on left-to-right layouts.
+Scenet reads a stack beside a tall panel down first in a manga too, with the tall panel on the
+left. The two later studies point the same way, toward downward orders in manga, but neither
+measures that layout mirrored.
+
+Future: **export.** A page export would write `page-progression-direction="rtl"` into an EPUB's
+spine, and `Manga: YesAndRightToLeft` into a CBZ's `ComicInfo.xml` (ComicInfo v2.0: `Unknown`,
+`No`, `Yes`, `YesAndRightToLeft`). Both come from the `direction` Panel Core and Page Core
+already record.
+
 ### Accessible SVG — SVG-AAM, Graphics ARIA, and what screen readers do
 
 [SVG-AAM](https://www.w3.org/TR/svg-aam-1.0/) ·
@@ -486,9 +537,30 @@ rules first, then a cost.
 
 Taken: the problem as it states it — the picture is given, and lettering is what is placed — and the
 confirmation that a placer needs to know where the speakers are, not what the picture shows. With a
-supplied picture behind Scenet's own figures (#70), the figures carry that geometry already; a
-contract declaring it for figures the artwork draws is #71. Not taken: finding the actors in the
-frame. Positions here come from the document, never from looking at pixels.
+supplied picture behind Scenet's own figures (#70), the figures carry that geometry already. For
+figures the artwork draws (#71), an [artwork contract](../reference/asset_contract.md#artwork-contracts)
+beside the picture declares it: each face, mouth and body, measured once, committed and reviewed,
+and read by the same placer as a puppet's. Not taken: finding the actors in the frame. Chun et al.
+take positions from the film; here they come from a file the author commits, never from looking at
+pixels — which is what keeps a compile deterministic and a layout explicable.
+
+### Manga109, the vocabulary of the artwork contract
+
+[*Building a Manga Dataset "Manga109" with Annotations for Multimedia Applications*](https://arxiv.org/abs/2005.04425)
+— Aizawa, Fujimoto, Otsubo, Ogawa, Matsui, Tsubota & Ikuta, IEEE MultiMedia 27(2), 2020
+
+Over 500,000 annotations on 21,142 pages of 109 volumes: for each page, boxes for frames, text,
+character **faces** and character **bodies**, each character with an identity: a record, at
+scale, of what is drawn where on a comic page.
+
+Taken: the vocabulary. What an [artwork contract](../reference/asset_contract.md#artwork-contracts)
+declares about each figure is what Manga109 annotates — a face and a body, under a name — because
+those are exactly the two things a balloon placer must avoid, and a field-tested split beats an
+invented one. Added: the **mouth**, which Manga109 does not record and a letterer needs, since a tail
+"should point to the mouth (or whatever the source of the sound is)" (Comicraft's glossary). Not
+taken: boxes. A face is a disc here, as a puppet's is, because a tail stops on its edge and a disc
+has one; a body may be any simple polygon. Not taken either: the text boxes, which are what Scenet
+places rather than what it is given.
 
 ### `<image>` in SVG renderers and editors
 
@@ -525,6 +597,24 @@ canopy silhouette, foliage with individual limbs. Nothing in the current backdro
 are read as values, and a mass has no branches. It becomes interesting if props ever want to be
 drawn rather than massed.
 
+### Magi, a helper that could propose a contract
+
+[*The Manga Whisperer: Automatically Generating Transcriptions for Comics*](https://arxiv.org/abs/2401.10224)
+— Sachdeva & Zisserman, CVPR 2024
+
+A single model that detects panels, text and characters on a manga page, clusters the characters by
+identity, links each line of text to whoever speaks it, and orders the text — to make manga
+readable to people who cannot see it.
+
+What it would be here: a **helper** that proposes an artwork contract from a picture — faces, bodies,
+and who is who — for an author to correct and commit. Never a compiler pass: a detector inside the
+compiler would make output depend on a model's version and a platform, could not run in the
+playground, and would put a large dependency through the licence gate. The contract on disk stays
+the source of truth, reviewed like any other file, and the compile stays deterministic. Not built:
+a contract is a handful of numbers, the debug overlay is its check, and a detector trained on
+manga pages, or MediaPipe's trained on photographs, would still need every one of them checked by
+eye.
+
 ## Examined and not reusable
 
 | Source | Why not |
@@ -533,7 +623,7 @@ drawn rather than massed.
 | **Graphviz / DOT** | Useful only as a debug dump of the scene graph. Graph layout optimises for edge crossings and hierarchy, which has nothing to do with pictorial composition. A dead end as a layout engine. |
 | **POV-Ray SDL** | A CSG raytracer scene language. Historically interesting as an early declarative scene description, but nothing transfers. |
 | **D3.js** | A DOM data-binding library rather than a layout engine, and this project is Python. Its underlying idea is already covered by Vega-Lite. |
-| **[MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker)** | 478 3-D landmarks. A *detection output*, not a notation: 478 points is a measurement of a face, and a drawn face has nothing like that much detail to place. Its landmark indices are useful as a **mapping target**, and are recorded as one in the asset contract. |
+| **[MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker)** | 478 3-D landmarks. A *detection output*, not a notation: 478 points is a measurement of a face, and a drawn face has nothing like that much detail to place. Its landmark indices are useful as a **mapping target**, and are recorded as one in the asset contract. Its face *detector* could propose the faces of an artwork contract, from a helper outside the compiler and never as a dependency of it; see [Magi](#magi-a-helper-that-could-propose-a-contract). |
 | **ARKit / MediaPipe blendshapes** | 52 continuous coefficients that "loosely correspond to FACS Action Units". Continuous blending is the wrong model for comics, which use a small set of conventionalised glyphs rather than interpolations between them. |
 | **[FACS](https://www.sciencedirect.com/topics/computer-science/facial-action-coding-system)** | Codes anatomical muscle actions for *observation*, is continuous, and is documented as weak on the lower face. Wrong direction, wrong granularity. |
 | **A-star pathfinding for balloon tails** | Frequently suggested, and wrong. A tail is a short tapered stroke from balloon rim to mouth; grid-based A-star produces jagged paths that look nothing like drawn tails. A straight tail with a collision test, bending to a single-control-point Bézier only when obstructed, is both simpler and better. |
