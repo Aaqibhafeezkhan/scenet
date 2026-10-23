@@ -45,6 +45,8 @@ below 1.0 means.
 
 ### Added
 
+- **`scenet build --watch`** rebuilds when the source or compilation dependencies change, with debounced saves and recovery after failed builds. The optional `watch` extra installs the file-watching dependency.
+
 - **`direction: ltr | rtl`, which way a comic is read** (#68): `rtl` for manga, read from the
   top right. It is the comic's progression, not its text's, and EPUB's word for it. Written once
   for the whole document — at the top of a panel, beside `panels:`, or in a comic script's front
