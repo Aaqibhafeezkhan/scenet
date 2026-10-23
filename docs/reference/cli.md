@@ -72,11 +72,12 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
   where the compiler tells you it did something you did not ask for.
 
 `--watch`
-: Build once, then rebuild when the source or a file read during compilation changes.
-  Failed builds are reported and the watcher keeps running, so saving a fix triggers another
-  build. Watch mode does not start a server or reload a browser. It uses standard-library
-  polling by default; install `scenet[watch]` to use `watchfiles` when available. Press
-  Ctrl-C to stop watching.
+: Build once, then rebuild when the source, a file read during compilation, or a tracked
+  dependency directory changes. Changes are debounced until inputs have stayed still for
+  about 300 ms. Failed builds are reported and watching continues; the source and previously
+  observed dependencies stay watched so a deleted source or a partial failed build can recover.
+  Watch mode does not start a server or reload a browser. It polls with the standard library
+  by default; install `scenet[watch]` to use `watchfiles` when available. Ctrl-C exits with 0.
 
 ### Output naming
 
