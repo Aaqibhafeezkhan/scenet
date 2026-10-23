@@ -170,10 +170,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     schema.add_argument("-o", "--output", type=Path, help="write to a file instead of stdout")
-    schema.add_argument(
+    which = schema.add_mutually_exclusive_group()
+    which.add_argument(
         "--scene",
         action="store_true",
         help="emit the multi-panel scene schema instead of the single-panel one",
+    )
+    which.add_argument(
+        "--artwork",
+        action="store_true",
+        help="emit the schema for an artwork contract, the *.art.yaml beside a picture",
     )
 
     mcp = subcommands.add_parser(
@@ -217,7 +223,16 @@ def _refuse_unsupported(paths: Sequence[Path]) -> bool:
             f"scenet: {path}: unsupported extension '{path.suffix}'; expected one of {expected}",
             file=sys.stderr,
         )
-    return bool(refused)
+    # A contract is YAML, and read as a panel it would be a page of unknown keys. It is
+    # checked through a panel that casts its figures, which is what knows its picture.
+    contracts = [path for path in paths if path.name.lower().endswith(CONTRACT_SUFFIX)]
+    for path in contracts:
+        print(
+            f"scenet: {path}: an artwork contract is not a document; it is checked through "
+            "the panel that casts its figures, beside its picture",
+            file=sys.stderr,
+        )
+    return bool(refused or contracts)
 
 
 def run_build(args: argparse.Namespace) -> int:
@@ -603,7 +618,8 @@ def run_schema(args: argparse.Namespace) -> int:
     """
     if _refuse_directory(args.output):
         return 2
-    schema = scene_schema() if args.scene else panel_schema()
+    which = "artwork" if args.artwork else "scene" if args.scene else "panel"
+    schema = {"panel": panel_schema, "scene": scene_schema, "artwork": artwork_schema}[which]()
     document = json.dumps(schema, indent=2, sort_keys=True) + "\n"
     if args.output is None:
         _print_document(document)
