@@ -19,6 +19,7 @@ from scenet.emit.svg import render
 from scenet.errors import ScenetError
 from scenet.pipeline import FRONTENDS, Book, compile_book_file
 from scenet.schema import artwork_schema, panel_schema, scene_schema
+from scenet.watch import watch_loop
 
 DESCRIPTION = "Compile a semantic comic-panel description into SVG."
 
@@ -249,8 +250,6 @@ def run_build(args: argparse.Namespace) -> int:
             status = 1
         # A bad initial save, missing source or output-name clash is recoverable in watch
         # mode. Keep watching until the source is fixed or the user stops the command.
-        from scenet.watch import watch_loop
-
         def rebuild() -> None:
             # Keep the previous dependency set if this build fails. Add dependencies seen
             # by the new attempt as well, so a partial failure cannot blind the watcher.
