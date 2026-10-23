@@ -5,7 +5,7 @@ from pathlib import Path
 
 from scenet import cli
 from scenet.pipeline import compile_book_file
-from scenet.watch import snapshot, watch_loop
+from scenet.watch import _nearest_existing_directory, snapshot, watch_loop
 
 
 PANEL = """cast:
@@ -126,7 +126,5 @@ def test_watch_loop_keeps_watching_dependencies_after_rebuild() -> None:
 
 
 def test_nearest_existing_directory_handles_missing_parent(tmp_path: Path) -> None:
-    from scenet.watch import _nearest_existing_directory
-
     missing = tmp_path / "art" / "x.png"
     assert _nearest_existing_directory(missing) == tmp_path.resolve()
