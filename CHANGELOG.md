@@ -32,6 +32,8 @@ below 1.0 means.
 
 ### Added
 
+- **`scenet build --watch`** rebuilds when the source or compilation dependencies change, with debounced saves and recovery after failed builds.
+
 - **`setting: {image: ..., fit: cover | contain}`**: a picture drawn elsewhere, behind the
   cast (#70). It is a backdrop of its own, so it is written instead of a `place` or
   `masses`, never beside them or beside a `horizon` (`conflicting-setting`); a `fit` with
