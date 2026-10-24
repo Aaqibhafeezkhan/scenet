@@ -25,6 +25,12 @@ below 1.0 means.
   `label`.** Nothing else in it moves, and `format_version` stays 1: a Core without them is
   still valid and writes back byte for byte, but golden Core files of your own will need
   regenerating once. 0.11 refuses the new keys.
+- **Every Panel Core gains `camera`; each actor `joints`, `features` and, when it looks at
+  somebody, `looking_at`; a backdrop of masses `time` and, for a named place, `place`** (#72).
+  Nothing else in it moves, no SVG changes, and `format_version` stays 1: a Core without them is
+  still valid and writes back byte for byte, but golden Core files of your own will need
+  regenerating once. Every gallery Core was compared with its 0.11.1 golden and differs by these
+  keys alone. A panel whose cast a picture draws has no `camera`, and 0.11 refuses the new keys.
 - **A balloon over its own speaker's body costs what it always should have** when the actor id
   is not the puppet's name (`ALICE: {reference: alice}`, `carol: {reference: alice}`). Such a
   speaker was charged as a bystander, so balloons drifted away from them. Three gallery
@@ -47,6 +53,20 @@ below 1.0 means.
 
 - **`scenet build --watch`** rebuilds when the source or compilation dependencies change, with debounced saves and recovery after failed builds. The optional `watch` extra installs the file-watching dependency.
 
+- **Export a panel's staging for image models** (#72): `scenet build --conditioning` writes five
+  files beside each panel's SVG — the pose as OpenPose COCO-18 JSON, a phrase and a box per
+  figure as GLIGEN takes them, a depth map (stepped grey planes in painter's order, white near),
+  an instance mask under the panel's own ids, where a character keeps its colour across panels
+  unless another in the same panel has the same hue, and the semantics: camera, setting, cast
+  with each character's mask colour, and lettering, as structure and never as a prompt. No model runs in Scenet: each is one more
+  emitter reading Panel Core, text, JSON or SVG, byte-identical like the rest, and nothing is
+  rasterised. The pose names left and right as OpenPose does, by the subject's side; a point
+  outside the panel, an ear, or a joint a puppet does not name is `0, 0, 0`. Figures a picture
+  draws have boxes and masks and no pose; a picture is the far plane; a panel read right to left
+  exports the same pose, boxes, depth and mask. `render_conditioning` and `Conditioning` join
+  `scenet.__all__`; MCP `render` takes `conditioning` (still five tools); the playground offers
+  the five downloads for a one-panel document. See the how-to, "Export a panel's staging for
+  image models".
 - **`direction: ltr | rtl`, which way a comic is read** (#68): `rtl` for manga, read from the
   top right. It is the comic's progression, not its text's, and EPUB's word for it. Written once
   for the whole document — at the top of a panel, beside `panels:`, or in a comic script's front
@@ -163,6 +183,11 @@ below 1.0 means.
 
 ### Fixed
 
+- **A backdrop of more than ten masses is drawn back to front.** Mass ids are numbered back
+  to front, and the painter's sort compared them as text, so `m10` was drawn before `m2`: ten
+  walls and a window in one plane painted the window, one rung paler, out under the walls. Masses
+  in one plane are now drawn in the order Panel Core lists them. No gallery panel has more than
+  ten, and none changes.
 - **A speaker is forgiven a balloon over their own body whatever the actor is called.** The
   placer half-weights the speaker's silhouette, and looked the speaker up by the puppet's name
   while the silhouettes are keyed by actor id. An actor called anything but its puppet, which
