@@ -23,7 +23,16 @@ import {
   type Compiler,
 } from "./compiler";
 import { exampleFiles } from "./examples";
-import { download, sourceFilename, stemFor, svgBlob, svgToPng, textBlob } from "./export";
+import {
+  CONDITIONING,
+  conditioningFile,
+  download,
+  sourceFilename,
+  stemFor,
+  svgBlob,
+  svgToPng,
+  textBlob,
+} from "./export";
 import { declaredPath, fontFileName } from "./fonts";
 import { declaredImagePath, imageFileName, isContract } from "./images";
 import {
@@ -522,7 +531,20 @@ async function main(): Promise<void> {
 
   const updateDownloads = (): void => {
     for (const button of downloadMenu.querySelectorAll<HTMLButtonElement>("[data-download]")) {
-      button.disabled = button.dataset["download"] !== "source" && lastGood === undefined;
+      const what = button.dataset["download"] ?? "";
+      if (CONDITIONING.some((exported) => exported.suffix === what)) {
+        // One set of exports per panel: a document of several gets them from the command line.
+        const none = lastGood?.conditioning == null;
+        button.disabled = none;
+        button.title =
+          lastGood === undefined
+            ? "Nothing has compiled yet"
+            : none
+              ? "One panel at a time: `scenet build --conditioning` writes every panel's"
+              : "For image models, as `scenet build --conditioning` writes it";
+        continue;
+      }
+      button.disabled = what !== "source" && lastGood === undefined;
     }
   };
 
@@ -540,6 +562,13 @@ async function main(): Promise<void> {
     if (what === "svg") download(`${stem}.svg`, svgBlob(lastGood.svg));
     if (what === "debug") download(`${stem}.debug.svg`, svgBlob(lastGood.debug));
     if (what === "core") download(`${stem}.core.json`, textBlob(lastGood.core, "application/json"));
+    const exported = lastGood.conditioning?.[what];
+    if (exported !== undefined) {
+      const model = editor.getModel() ?? modelFor("panel");
+      const panel = kindOf(model) === "panel" ? undefined : lastGood.panels[0];
+      const { filename, type } = conditioningFile(stem, what, panel);
+      download(filename, textBlob(exported, type));
+    }
     if (what === "png") {
       setStatus("Rendering PNG…", true);
       try {

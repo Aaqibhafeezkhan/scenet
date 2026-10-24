@@ -46,7 +46,7 @@ from scenet.ir import (
     TypeSize,
     Weather,
 )
-from scenet.places import PLACES, Place
+from scenet.places import Place, place_of
 
 __all__ = [
     "ANGLES",
@@ -62,6 +62,7 @@ __all__ = [
     "labels",
     "name",
     "sentence",
+    "traits",
 ]
 
 #: Each rung of the shot ladder, as a letterer's script would name it.
@@ -241,11 +242,10 @@ def _shot(panel: PanelIR) -> str:
 
 def _place(setting: SettingSpec) -> str:
     """Where, from the masses: a named place's, or indoors or out."""
-    masses = tuple(setting.masses)
-    for place in Place:
-        if PLACES[place] == masses:
-            return PLACE_NAMES[place]
-    return "Indoors" if any(mass.kind in INDOOR for mass in masses) else "Outdoors"
+    place = place_of(setting.masses)
+    if place is not None:
+        return PLACE_NAMES[place]
+    return "Indoors" if any(mass.kind in INDOOR for mass in setting.masses) else "Outdoors"
 
 
 def _setting(setting: SettingSpec) -> str:
@@ -272,15 +272,32 @@ def _where(x: float, width: float) -> str:
     return "centre"
 
 
+def traits(pose: str, expression: str, marks: Sequence[Mark]) -> list[str]:
+    """How a figure stands, its face and its marks, as a description says them.
+
+    What goes without saying -- standing, a neutral face -- is left out. The one phrasing
+    of a figure: the description reads it, and so does the boxes export (#72).
+
+    Example:
+        >>> from scenet.ir import Mark
+        >>> traits("hands_on_hips", "surprise", [Mark.PLEWDS])
+        ['hands on hips', 'surprised', 'sweating']
+        >>> traits("standing_neutral", "neutral", [])
+        []
+    """
+    parts: list[str] = []
+    if pose != _STANDING:
+        parts.append(pose.replace("_", " "))
+    if expression != _NEUTRAL:
+        parts.append(EXPRESSIONS.get(expression, expression.replace("_", " ")))
+    parts.extend(MARKS[mark] for mark in marks)
+    return parts
+
+
 def _figure(panel: PanelIR, actor: str, x: float, width: float) -> str:
     """One figure: where, how they stand, their face, their marks, and whom they face."""
     member = panel.cast[actor]
-    parts = [name(actor), _where(x, width)]
-    if member.pose != _STANDING:
-        parts.append(member.pose.replace("_", " "))
-    if member.expression != _NEUTRAL:
-        parts.append(EXPRESSIONS.get(member.expression, member.expression.replace("_", " ")))
-    parts.extend(MARKS[mark] for mark in member.marks)
+    parts = [name(actor), _where(x, width), *traits(member.pose, member.expression, member.marks)]
     target = panel.gaze_targets().get(actor)
     if target is not None:
         heard = target not in panel.cast
