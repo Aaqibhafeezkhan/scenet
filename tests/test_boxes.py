@@ -167,3 +167,25 @@ class TestWhatIsDrawn:
         )
         # At the frame's bottom edge, y = 800, the sides are at x = 320 and 580.
         assert _boxes(core)[0]["box"] == [0.32, 0.875, 0.58, 1.0]
+
+
+def test_a_negative_zero_is_written_as_zero():
+    """A hand-edited Core may say `-0.0`; a fraction of the panel never does."""
+    core = compile_source(DUEL).core
+    alice = core.actor("alice")
+    hull = ((-0.0, alice.hull[0][1]), *alice.hull[1:])
+    core = core.model_copy(
+        update={"actors": (alice.model_copy(update={"hull": hull}), *core.actors[1:])}
+    )
+    text = render_boxes(core)
+    assert "-0.0" not in text
+    assert _boxes(core)[0]["box"][0] == 0.0
+
+
+def test_a_box_smaller_than_a_unit_is_still_a_box():
+    """Area, not size, decides: half a square unit inside the panel is something there."""
+    core = compile_source(DUEL).core
+    alice = core.actor("alice")
+    tiny = alice.model_copy(update={"hull": ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))})
+    core = core.model_copy(update={"actors": (tiny, *core.actors[1:])})
+    assert [box["id"] for box in _boxes(core)] == ["alice", "bob"]
