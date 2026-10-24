@@ -5,7 +5,7 @@ from pathlib import Path
 
 from scenet import cli
 from scenet.pipeline import compile_book_file
-from scenet.watch import snapshot, watch_loop, _nearest_existing_directory
+from scenet.watch import _nearest_existing_directory, snapshot, watch_loop
 
 
 PANEL = """cast:
