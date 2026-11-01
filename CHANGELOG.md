@@ -10,6 +10,48 @@ below 1.0 means.
 
 ## [Unreleased]
 
+### Added
+
+- **The playground's gallery is a guided tour (#237).** It opens on a new example,
+  `38-tour.scene.yaml`: one page lettered over both gallery pictures in colour, with posed
+  puppets, figures a picture draws, a locale caption, a thought, emanata, a sound effect and an
+  inset. The menu groups the examples by theme, Previous and Next walk them in that order, and
+  under the editor each says in a sentence what it shows, with a link to the page of the
+  documentation that explains it. `#example=<file>` opens a gallery example by name, a link
+  that does not go stale as a `#src=` share link does when the example changes.
+- **The gallery manifest gains `groups:`, `start:`, and `group:`, `summary:` and `doc:` on
+  every entry**, and its titles are short names. Entries are only ever appended, as its header
+  now says: a playground draft remembers its example by position. The spec pack prints each
+  example's summary under its title.
+- **`scenet build --watch`** (#78) rebuilds when the source or compilation dependencies change,
+  with debounced saves and recovery after failed builds. The optional `watch` extra installs
+  the file-watching dependency.
+
+### Changed
+
+- **A note in the playground is styled as information**, neutral and marked ℹ, not as an
+  orange warning: nothing is wrong when the compiler says what it decided.
+
+**Upgrading from 0.12.0.**
+
+- **The depth map of every panel with a ground, floor, water or ceiling changes once** (#227),
+  and with it the bytes of its `.depth.svg`: regenerate golden depth maps of your own. Nothing
+  else changes, Panel Core included.
+
+### Changed
+
+- **A ground, floor or stretch of water recedes in the depth export** (#227), instead of standing
+  as one flat grey that a depth model reads as a wall. Each is a straight vertical ramp from its own
+  step at the horizon to the farthest figure's step at the bottom edge, white when every figure
+  is; a ceiling is the same ramp running up to the top edge. A flat surface's inverse depth is
+  linear in screen height, so the straight ramp is the shape perspective gives. The ramp is never
+  darker than its plane's step, so the painter's order holds, and never paler than a figure
+  standing on it. A ground in the foreground plane stays flat, and so does every other kind. Each
+  ramped region's paint names its step as the fallback. A hand-edited Core with no horizon has
+  each surface recede from its own far edge.
+
+## [0.12.0] - 2026-10-29
+
 **Upgrading from 0.11.1.**
 
 - **A font path written with `\` between folders is refused**, on Windows as everywhere else:
@@ -50,8 +92,6 @@ below 1.0 means.
   SVG written before, for a pipeline that post-processes it; debug overlays are unchanged.
 
 ### Added
-
-- **`scenet build --watch`** rebuilds when the source or compilation dependencies change, with debounced saves and recovery after failed builds. The optional `watch` extra installs the file-watching dependency.
 
 - **Export a panel's staging for image models** (#72): `scenet build --conditioning` writes five
   files beside each panel's SVG — the pose as OpenPose COCO-18 JSON, a phrase and a box per
@@ -1479,7 +1519,9 @@ or has drifted out of step with the code fails the build.
 - `long_shot` and `full_shot` crop at the same landmark, so with no environment to show
   they can differ only by headroom.
 
-[Unreleased]: https://github.com/creatoan/scenet/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/creatoan/scenet/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/creatoan/scenet/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/creatoan/scenet/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/creatoan/scenet/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/creatoan/scenet/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/creatoan/scenet/compare/v0.8.0...v0.9.0
