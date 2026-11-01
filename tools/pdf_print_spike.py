@@ -10,26 +10,28 @@ The same resolved fixture is used by both backends so geometry and ink intent ca
 be inspected side by side.
 """
 
-from __future__ import annotations
-
 import argparse
+import datetime
 import hashlib
+import importlib
 import os
+from io import BytesIO
 from pathlib import Path
-import re
-import zlib
 
 PAGE_W = 612.0
 PAGE_H = 792.0
 BLEED = 9.0
 TRIM = (BLEED, BLEED, PAGE_W - BLEED, PAGE_H - BLEED)
+# Fixture: rich-black mass with K-only lettering and border overpinting on top.
+# The mass fill uses overprint OFF so colour plates beneath survive;
+# lettering and the balloon border use overprint ON so they land on K alone.
 FIXTURE = (
     "q\n"
-    "0 0 0 1 k\n"
-    "/GSoverprint gs\n"
-    "BT /F1 18 Tf 72 700 Td (SCENET PRINT SPIKE) Tj ET\n"
     "0.4 0 0 1 k\n"
     "72 430 468 210 re f\n"
+    "/GSoverprint gs\n"
+    "0 0 0 1 k\n"
+    "BT /F1 18 Tf 120 510 Td (SCENET PRINT SPIKE) Tj ET\n"
     "0 0 0 1 k\n"
     "1 w 72 430 468 210 re S\n"
     "Q\n"
@@ -38,11 +40,9 @@ FIXTURE = (
 
 def _pdf_date() -> str:
     """Use SOURCE_DATE_EPOCH so PDF metadata is stable across repeated builds."""
-    import datetime
-
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
-    date = datetime.datetime.fromtimestamp(epoch, datetime.UTC)
-    return date.strftime("D:%Y%m%d%H%M%SZ")
+    dt = datetime.datetime.fromtimestamp(epoch, datetime.UTC)
+    return dt.strftime("D:%Y%m%d%H%M%SZ")
 
 
 def direct_pdf() -> bytes:
@@ -58,7 +58,7 @@ def direct_pdf() -> bytes:
             b"/ExtGState << /GSoverprint 5 0 R >> >> /Contents 6 0 R >>"
         ),
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        b"<< /Type /ExtGState /Type /ExtGState /OP true /op true /OPM 1 >>",
+        b"<< /Type /ExtGState /OP true /op true /OPM 1 >>",
         (
             b"<< /Length "
             + str(len(FIXTURE.encode("ascii"))).encode()
@@ -68,12 +68,7 @@ def direct_pdf() -> bytes:
         ),
         (
             b"<< /Title (Scenet PDF print spike) /Producer (Scenet spike) "
-            + f"/CreationDate ({date}) /ModDate ({date}) ".encode()
-            + b"/ID [<"
-            + hashlib.sha256(FIXTURE.encode("ascii")).hexdigest()[:32].encode()
-            + b"><"
-            + hashlib.sha256(FIXTURE.encode("ascii")).hexdigest()[:32].encode()
-            + b">] >>"
+            + f"/CreationDate ({date}) /ModDate ({date}) >>".encode()
         ),
     ]
     output = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
@@ -101,13 +96,13 @@ def direct_pdf() -> bytes:
 
 def reportlab_pdf() -> bytes:
     """Emit the identical fixture using ReportLab's public canvas API."""
-    from io import BytesIO
-
-    from reportlab.lib.colors import CMYKColor
-    from reportlab.pdfgen import canvas
+    canvas_mod = importlib.import_module("reportlab.pdfgen.canvas")
+    colors_mod = importlib.import_module("reportlab.lib.colors")
+    canvas_cls = canvas_mod.Canvas
+    CMYKColor = colors_mod.CMYKColor
 
     stream = BytesIO()
-    doc = canvas.Canvas(
+    doc = canvas_cls(
         stream,
         pagesize=(PAGE_W, PAGE_H),
         pageCompression=0,
@@ -118,19 +113,23 @@ def reportlab_pdf() -> bytes:
     doc.setAuthor("Scenet")
     doc.setTrimBox(TRIM)
     doc.setBleedBox((0, 0, PAGE_W, PAGE_H))
-    doc.setFillOverprint(1)
-    doc.setStrokeOverprint(1)
-    doc.setFillColor(CMYKColor(0, 0, 0, 1))
-    doc.setFont("Helvetica", 18)
-    doc.drawString(72, 700, "SCENET PRINT SPIKE")
+    # Mass fill: rich-black with overprint OFF so colour plates beneath survive
+    doc.setFillOverprint(0)
+    doc.setStrokeOverprint(0)
     doc.setFillColor(CMYKColor(0.4, 0, 0, 1))
     doc.rect(72, 430, 468, 210, fill=1, stroke=0)
+    # Lettering and border: K-only with overprint ON
+    doc.setFillOverprint(1)
+    doc.setStrokeOverprint(1)
+    doc.setOverprintMask(1)
     doc.setFillColor(CMYKColor(0, 0, 0, 1))
+    doc.setFont("Helvetica", 18)
+    doc.drawString(120, 510, "SCENET PRINT SPIKE")
+    doc.setStrokeColor(CMYKColor(0, 0, 0, 1))
     doc.rect(72, 430, 468, 210, fill=0, stroke=1)
     doc.showPage()
     doc.save()
-    data = stream.getvalue()
-    return data
+    return stream.getvalue()
 
 
 def inspect_pdf(data: bytes) -> dict[str, bool]:
@@ -142,11 +141,13 @@ def inspect_pdf(data: bytes) -> dict[str, bool]:
         "bleed_box": "/BleedBox [0 0 612 792]" in text,
         "k_only_operator": "0 0 0 1 k" in text,
         "overprint_state": "/OP true" in text and "/op true" in text,
+        "opm_1": "/OPM 1" in text,
         "reproducible_id_present": "/ID [" in text,
     }
 
 
 def main() -> int:
+    """Run the spike: emit a PDF with the chosen backend and print structural checks."""
     parser = argparse.ArgumentParser()
     parser.add_argument("backend", choices=("direct", "reportlab"))
     parser.add_argument("--output", type=Path, required=True)
