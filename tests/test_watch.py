@@ -137,16 +137,16 @@ def test_watch_survives_broken_then_fixed_document(tmp_path: Path, monkeypatch) 
     good_svg = source.with_name("watch.svg").read_bytes()
     source.with_name("watch.svg").unlink()
 
-    edits: list[tuple[str, bool]] = [
-        ("not: valid: yaml: {", False),  # break it
-        (PANEL, True),                   # fix it
+    edits: list[str] = [
+        "not: valid: yaml: {",  # break it
+        PANEL,  # fix it
     ]
 
     def fake_watch_loop(
         dependencies: set[Path],
         rebuild: Callable[[], object],
     ) -> None:
-        for content, should_succeed in edits:
+        for content in edits:
             source.write_text(content, encoding="utf-8")
             rebuild()
         assert source.with_name("watch.svg").read_bytes() == good_svg
@@ -170,8 +170,6 @@ def test_watch_survives_non_scenet_exception(tmp_path: Path, monkeypatch) -> Non
         for _ in range(2):
             calls.append(1)
             rebuild()
-
-    import unittest.mock
 
     original_compile = cli.compile_book_file
 
@@ -240,11 +238,6 @@ def test_watch_triggers_on_right_files(tmp_path: Path) -> None:
     unrelated.write_text("nothing", encoding="utf-8")
 
     dependencies: set[Path] = {source, font}
-    state = {"revision": 0}
-    rebuild_triggers: list[set[Path]] = []
-
-    def fake_wait(_interval: float, deps: set[Path]) -> None:
-        rebuild_triggers.append(set(deps))
 
     # Only a change to a dependency triggers the snapshot change
     snap_before = snapshot(dependencies)
@@ -268,8 +261,8 @@ def test_watch_deleted_then_restored_source_rebuilds(tmp_path: Path, monkeypatch
     source.with_name("watch.svg").unlink()
 
     edits = [
-        None,    # delete the source
-        PANEL,   # restore it
+        None,  # delete the source
+        PANEL,  # restore it
     ]
 
     def fake_watch_loop(
