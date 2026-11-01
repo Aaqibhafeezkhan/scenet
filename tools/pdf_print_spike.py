@@ -99,7 +99,7 @@ def reportlab_pdf() -> bytes:
     canvas_mod = importlib.import_module("reportlab.pdfgen.canvas")
     colors_mod = importlib.import_module("reportlab.lib.colors")
     canvas_cls = canvas_mod.Canvas
-    CMYKColor = colors_mod.CMYKColor
+    cmyk_color = colors_mod.CMYKColor
 
     stream = BytesIO()
     doc = canvas_cls(
@@ -116,16 +116,16 @@ def reportlab_pdf() -> bytes:
     # Mass fill: rich-black with overprint OFF so colour plates beneath survive
     doc.setFillOverprint(0)
     doc.setStrokeOverprint(0)
-    doc.setFillColor(CMYKColor(0.4, 0, 0, 1))
+    doc.setFillColor(cmyk_color(0.4, 0, 0, 1))
     doc.rect(72, 430, 468, 210, fill=1, stroke=0)
     # Lettering and border: K-only with overprint ON
     doc.setFillOverprint(1)
     doc.setStrokeOverprint(1)
     doc.setOverprintMask(1)
-    doc.setFillColor(CMYKColor(0, 0, 0, 1))
+    doc.setFillColor(cmyk_color(0, 0, 0, 1))
     doc.setFont("Helvetica", 18)
     doc.drawString(120, 510, "SCENET PRINT SPIKE")
-    doc.setStrokeColor(CMYKColor(0, 0, 0, 1))
+    doc.setStrokeColor(cmyk_color(0, 0, 0, 1))
     doc.rect(72, 430, 468, 210, fill=0, stroke=1)
     doc.showPage()
     doc.save()
