@@ -22,6 +22,7 @@ from scenet.ir import (
     AnchorX,
     BalloonKind,
     CaptionTone,
+    Direction,
     Fit,
     Horizon,
     Mark,
@@ -37,12 +38,13 @@ from scenet.ir import (
     Weather,
 )
 from scenet.places import Place
-from scenet.schema import panel_schema, scene_schema
+from scenet.schema import artwork_schema, panel_schema, scene_schema
 
 REPO = Path(__file__).resolve().parents[1]
 SHIPPED = {
     "panel": REPO / "editor" / "schemas" / "panel.schema.json",
     "scene": REPO / "editor" / "schemas" / "scene.schema.json",
+    "artwork": REPO / "editor" / "schemas" / "artwork.schema.json",
 }
 
 EXAMPLES = sorted(
@@ -53,7 +55,7 @@ EXAMPLES = sorted(
 
 
 def generated(kind: str) -> str:
-    schema = scene_schema() if kind == "scene" else panel_schema()
+    schema = {"panel": panel_schema, "scene": scene_schema, "artwork": artwork_schema}[kind]()
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"
 
 
@@ -78,6 +80,7 @@ class TestPanelSchema:
             "script",
             "lettering",
             "description",
+            "direction",
         }
 
     def test_it_is_a_valid_schema(self):
@@ -102,6 +105,7 @@ class TestPanelSchema:
             Weather,
             Fit,
             SfxSize,
+            Direction,
         ],
     )
     def test_every_enum_member_reaches_the_schema(self, enum: type[StrEnum]):
@@ -243,9 +247,18 @@ class TestSceneSchema:
         panel = panel_schema()["properties"]
         scene = scene_schema()["properties"]
         member = scene["panels"]["additionalProperties"]["properties"]
-        assert set(panel) <= set(member)
+        # A direction is the whole document's: a scene's, never one panel's (#68).
+        assert set(panel) - set(member) == {"direction"}
         # A description says what one panel shows: a panel's, never a scene's default.
         assert set(panel) - set(scene) == {"description"}
+
+    def test_a_panel_of_a_scene_is_offered_no_direction(self):
+        member = scene_schema()["properties"]["panels"]["additionalProperties"]
+        assert member["additionalProperties"] is False
+        errors = Draft202012Validator(scene_schema()).iter_errors(
+            {"direction": "rtl", "panels": {"one": {"direction": "ltr"}}}
+        )
+        assert [list(error.absolute_path) for error in errors] == [["panels", "one"]]
 
 
 class TestShippedSchemasAreCurrent:
@@ -255,13 +268,58 @@ class TestShippedSchemasAreCurrent:
     completions that no longer compile. CI runs these, so that cannot ship.
     """
 
-    @pytest.mark.parametrize("kind", ["panel", "scene"])
+    @pytest.mark.parametrize("kind", ["panel", "scene", "artwork"])
     def test_shipped_schema_is_up_to_date(self, kind: str):
         path = SHIPPED[kind]
         assert path.exists(), f"{path} is missing; run `npm run schemas` in editor/"
         assert path.read_text(encoding="utf-8") == generated(kind), (
             f"{path} is stale; run `npm run schemas` in editor/"
         )
+
+
+class TestArtworkSchema:
+    """The schema an editor checks a `*.art.yaml` against, beside its picture (#71)."""
+
+    CONTRACT = """
+size: [3000, 2000]
+figures:
+  ana:
+    face: {center: [1240, 610], radius: 150}
+    mouth: [1270, 700]
+    body: [[1050, 520], [1450, 520], [1500, 2000], [1000, 2000]]
+  ben:
+    face: {center: [2210, 580], radius: 140}
+keep_out:
+  - [[400, 1200], [900, 1200], [900, 1700], [400, 1700]]
+"""
+
+    def test_a_contract_as_the_issue_writes_it_is_valid(self):
+        assert problems(artwork_schema(), self.CONTRACT) == []
+
+    @pytest.mark.parametrize(
+        ("broken", "where"),
+        [
+            ("mouth: [1270, 700]", "mouht: [1270, 700]"),
+            ("radius: 150", "radius: 0"),
+            ("size: [3000, 2000]", "size: [3000]"),
+            ("  - [[400, 1200], [900, 1200], [900, 1700], [400, 1700]]", "  - [[400, 1200]]"),
+        ],
+    )
+    def test_a_slip_is_flagged(self, broken: str, where: str):
+        assert problems(artwork_schema(), self.CONTRACT.replace(broken, where))
+
+    def test_the_command_writes_it(self, tmp_path: Path):
+        target = tmp_path / "artwork.schema.json"
+        assert main(["schema", "--artwork", "-o", str(target)]) == 0
+        assert target.read_text(encoding="utf-8") == generated("artwork")
+
+    def test_the_editor_checks_contracts_against_it(self):
+        manifest = json.loads((REPO / "editor" / "package.json").read_text(encoding="utf-8"))
+        associations = {
+            entry["fileMatch"]: entry["url"] for entry in manifest["contributes"]["yamlValidation"]
+        }
+        assert associations["*.art.yaml"] == "./schemas/artwork.schema.json"
+        assert "--artwork -o editor/schemas/artwork.schema.json" in manifest["scripts"]["schemas"]
 
 
 class TestSchemaCommand:
@@ -284,3 +342,40 @@ class TestSchemaCommand:
         first = capsys.readouterr().out
         main(["schema"])
         assert capsys.readouterr().out == first
+
+
+class TestAFigureInTheCast:
+    """`figure:` in place of `reference:` (#71), as the frontend and the model hold it."""
+
+    @pytest.mark.parametrize(
+        "member",
+        [
+            "{figure: ana}",
+            "{reference: alice}",
+            "{figure: ana, reference: null}",
+            "{figure: ana, pose: null, facing: null}",
+        ],
+    )
+    def test_accepted(self, member: str):
+        assert problems(panel_schema(), f"cast: {{a: {member}}}") == []
+
+    @pytest.mark.parametrize(
+        "member",
+        [
+            "{figure: ana, reference: alice}",
+            "{figure: ana, pose: pointing}",
+            "{figure: ana, marks: [plewds]}",
+            "{figure: ana, at: center}",
+            "{pose: pointing}",
+        ],
+    )
+    def test_refused(self, member: str):
+        assert problems(panel_schema(), f"cast: {{a: {member}}}")
+
+    def test_a_scene_panel_may_override_one_key_of_an_inherited_figure(self):
+        scene = "cast: {a: {figure: ana}}\npanels: {one: {cast: {a: {figure: ben}}}}\n"
+        assert problems(scene_schema(), scene) == []
+
+    def test_a_scene_panel_may_not_pose_a_figure(self):
+        scene = "panels: {one: {cast: {a: {figure: ben, pose: pointing}}}}\n"
+        assert problems(scene_schema(), scene)

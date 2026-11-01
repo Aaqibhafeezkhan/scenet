@@ -20,7 +20,7 @@ Five, deliberately. Each extra tool is more for a model to read before it can ch
 | `list_puppets` | — | Every character, with each pose and expression it declares |
 | `validate` | `source`, `syntax`, `deep`, `files` | `{valid, findings}`, every finding at once; `valid` when none is an error |
 | `compile` | `source`, `syntax`, `files` | Each panel's notes and [Panel Core](panel_core.md), then each page's [Page Core](panel_core.md#page-core) |
-| `render` | `source`, `syntax`, `live_text`, `aria`, `files` | A summary, then one SVG per panel, then one per page |
+| `render` | `source`, `syntax`, `live_text`, `aria`, `files`, `conditioning` | A summary, then one SVG per panel, then one per page, then each panel's exports for image models when asked |
 
 Every tool is annotated **read-only, idempotent and closed-world**: none writes a file, reaches
 the network, or answers differently on a second call. A client can run them without asking.
@@ -38,7 +38,10 @@ the network, or answers differently on a second call. A client can run them with
   never reads, and are read in memory, so nothing is written to the server's disk. A path is held
   to a document's own rules — relative, `/` between folders — and a value that is not base64 is a
   tool error naming it. Left out, a document that names a file gets `image-file` or `font-file`,
-  as text with no folder does anywhere.
+  as text with no folder does anywhere. A cast of [figures a picture draws](language.md#figures-the-picture-draws)
+  also needs the picture's artwork contract, beside it and named after it —
+  `{"art/p01.png": "…", "art/p01.art.yaml": "…"}`; without it the finding is `artwork-contract`,
+  at the line naming the picture.
 
 `syntax`
 : `yaml` (default) for a `*.panel.yaml` or `*.scene.yaml` document — a top-level `panels:` key
@@ -96,6 +99,12 @@ with `pages:` gets one more per page after them, `scenet://pages/N.svg`. The SVG
 it is drawn over is written into it as a `data:` URI, since whoever reads the SVG has no folder to
 find a linked one in. A document with no picture is byte-identical to plain `scenet build`.
 
+With `conditioning: true`, each panel's [exports for image
+models](../howto/export_for_image_models.md) follow the pages, five per panel and exactly as
+`scenet build --conditioning` writes them: `scenet://panels/NAME.pose.json`, `.boxes.json` and
+`.semantics.json` as `application/json`, `.depth.svg` and `.mask.svg` as `image/svg+xml`. A
+parameter rather than a sixth tool, which keeps the server at five.
+
 It is never sent as an image content block. Hosts forward image blocks to the model, and model
 APIs that accept images do not accept SVG, so an image block would fail the whole turn instead
 of showing a picture. There is no PNG either: rasterising would put a renderer in the runtime
@@ -106,7 +115,9 @@ dependencies for one tool.
 On connecting, the server sends instructions that many hosts hand straight to the model. They
 say what to do rather than what the server is: read `get_spec` first, cast only what
 `list_puppets` lists, validate until clean, and pass text rather than paths — with the bytes
-of any picture or font the document names in `files`.
+of any picture or font the document names in `files`, and of the artwork contract beside a
+picture whose figures the cast names. Figures have no tool of their own, which keeps the server at
+five: their names are the contract's, and `get_spec`'s characters part says where they come from.
 
 ## Keeping stdout clean
 

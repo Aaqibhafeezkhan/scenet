@@ -11,7 +11,7 @@ Four commands: `build` compiles a document, `check` validates one without compil
 ## `scenet build`
 
 ```
-scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet]
+scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--conditioning] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet]
 ```
 
 Compiles `SOURCE` to SVG. The frontend is chosen by extension:
@@ -38,6 +38,13 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
 : Also write a diagnostic overlay showing the geometry the solver was working against:
   silhouette hulls, face exclusion zones, named anchors, gaze vectors and tail routes.
   This is usually the fastest way to see why a panel came out the way it did.
+
+`--conditioning`
+: Also export each panel's staging for image models, as five files beside its SVG: the pose as
+  OpenPose JSON, boxes with phrases, a depth map, a mask, and the semantics. No model runs:
+  each is another emitter reading Panel Core, text, JSON or SVG, and byte-identical like the
+  rest. Per panel only; a page's frames are in its Page Core (`--core`). See
+  [export for image models](../howto/export_for_image_models.md).
 
 `--live-text`
 : Emit selectable `<text>` elements instead of glyph outlines. Smaller files and
@@ -92,10 +99,21 @@ story.scene.yaml     →  story.page-1.svg
                         story.page-1.debug.svg      (with --debug)
 ```
 
+With `--conditioning`, each panel's exports for image models are named after its SVG:
+
+```
+duel.panel.yaml      →  duel.svg
+                        duel.pose.json              (with --conditioning)
+                        duel.boxes.json
+                        duel.depth.svg
+                        duel.mask.svg
+                        duel.semantics.json
+```
+
 Two outputs that would be the same file are a usage error, exit 2, and nothing is written: a
-panel named `page-1` beside a page, `strip` beside the strip, or `x.debug` beside panel `x`'s
-overlay. One file silently replacing the other is the kind of loss Scenet refuses everywhere
-else. Names are compared ignoring case, as Windows and macOS compare them, so a document
+panel named `page-1` beside a page, `strip` beside the strip, or `x.debug` or `x.depth` beside
+panel `x`'s overlay or depth map. One file silently replacing the other is the kind of loss
+Scenet refuses everywhere else. Names are compared ignoring case, as Windows and macOS compare them, so a document
 writes the same set of files everywhere. A panel name holding `/` or `\` cannot be part of
 a file name and is refused the same way.
 
@@ -231,6 +249,7 @@ note as information rather than a red squiggle.
 | `scenet/caption-speaker` | error | `by` on a caption whose `kind` is not `spoken` |
 | `scenet/ordering-cycle` | error | `left_of`/`right_of` relations that form a cycle |
 | `scenet/composition` | error | An `over:` chain that is missing or cyclic |
+| `scenet/panel-direction` | error | A panel of a scene that writes `direction`, or a comic script's `@direction:`: the reading direction is the whole document's |
 | `scenet/duplicate-panel` | error | Two panels in a comic script with the same name, even counting pages |
 | `scenet/page-layout` | error | A page placing a panel that does not exist, or one twice, two stacked columns side by side, two insets that overlap, an inset too big for its panel, a slant that cannot apply or is too steep, or no room for its tiers |
 | `scenet/unknown-puppet` | error | A `reference` naming a character the library lacks |
@@ -239,6 +258,10 @@ note as information rather than a red squiggle.
 | `scenet/unknown-pose` | error | A `pose` naming one its puppet does not declare |
 | `scenet/unknown-expression` | error | An `expression` naming one its puppet does not declare |
 | `scenet/image-file` | error | A picture in `setting.image` that is absolute, missing, not a PNG or JPEG, turned by its EXIF orientation, or named by text with no folder |
+| `scenet/artwork-contract` | error | A picture whose figures the panel casts has no artwork contract beside it (`art/p01.png` → `art/p01.art.yaml`), or one that is not YAML, repeats or misspells a key, holds a value out of place, puts a point off the picture, or was measured on a picture of another size. Reported in the contract when the document is checked as a file |
+| `scenet/unknown-figure` | error | A cast `figure` in a panel that names no picture, or a line spoken or sound made by a figure the panel's picture does not draw |
+| `scenet/conflicting-cast` | error | A cast member with both `reference` and `figure`, a puppet's `pose`, `expression`, `marks`, `at` or `facing` on a figure, a cast mixing puppets and figures, or two members playing one figure |
+| `scenet/figure-staging` | error | A staging relation naming a figure a picture draws, or a `camera` on a panel whose cast is all figures |
 | `scenet/font-file` | error | A font in `lettering.font` that is absolute, missing, not a font, or named by text with no folder |
 | `scenet/layout` | error | Valid, but no layout satisfies its required constraints (`--deep` only) |
 | `scenet/balloon-placement` | error | No legal position exists for a balloon (`--deep` only) |
@@ -250,6 +273,11 @@ note as information rather than a red squiggle.
 | `scenet/internal` | error | A failure with no more specific rule — worth reporting |
 
 ### Source positions
+
+A finding is located in the file it is about, which is usually the document checked. A fault inside
+a picture's [artwork contract](asset_contract.md#artwork-contracts) is located in the contract —
+its own path, line and column — since that is the file to open to fix it; checked as text, with no
+file of its own, the document points at the line naming the picture instead.
 
 `yaml.safe_load` discards the position of every value, so the document is composed a
 second time with `yaml.compose`, whose node tree carries `start_mark` and `end_mark`. Those
@@ -349,7 +377,7 @@ close an import cycle.
 ## `scenet schema`
 
 ```
-scenet schema [-o OUTPUT] [--scene]
+scenet schema [-o OUTPUT] [--scene | --artwork]
 ```
 
 Emits the JSON Schema for a panel document, derived from the same pydantic models the
@@ -365,9 +393,16 @@ the editor suggests cannot drift from what compiles — see
   same keys as a panel — where they act as defaults every panel inherits — plus `panels:`,
   whose members may additionally carry `over:`.
 
+`--artwork`
+: Emit the schema for an [artwork contract](asset_contract.md#artwork-contracts), the
+  `*.art.yaml` file beside a supplied picture that declares the figures it draws. What a
+  schema cannot say — every point on the picture, every region a simple polygon, the size
+  the picture's own — `scenet check` does.
+
 ```bash
 scenet schema -o panel.schema.json
 scenet schema --scene -o scene.schema.json
+scenet schema --artwork -o artwork.schema.json
 ```
 
 The output is sorted and indented, so it is stable under version control.

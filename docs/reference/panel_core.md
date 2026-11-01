@@ -25,7 +25,8 @@ going straight to pixels. The same split pays for itself here, in four ways:
 ## Properties
 
 - **Fully numeric.** Every position, size and scale is an absolute number in panel units. No
-  `left_third`, no `medium_shot` — those are resolved away.
+  `left_third`, no `medium_shot` — those are resolved away. The camera records the shot it was
+  asked for beside what it made of it, but nothing is drawn from the name.
 - **Still named.** Actors, balloons, captions and anchors keep their source identifiers, so a Core
   file is readable and diffable. This is what separates it from SVG.
 - **Deterministic.** Floats are rounded to a fixed precision on emission, so identical input yields
@@ -190,6 +191,44 @@ words, recorded so the emitter copies it. A backdrop of masses has no `image` ke
 written before pictures existed reads and writes byte for byte as it did, so neither `image` nor a
 missing `horizon` needed a `format_version` bump.
 
+A picture that draws its own people has an [artwork contract](asset_contract.md#artwork-contracts)
+beside it, and what the contract declares is recorded here in the panel's units, mapped from the
+picture's pixels through the same fit as `box`. The people are `figures`, beside `actors`; the
+regions to stay off are the picture's `keep_out`.
+
+```json
+"figures": [
+  {
+    "figure": "ana",
+    "actor": "ana",
+    "face_exclusion": { "cx": 413.33, "cy": 103.33, "r": 50.0 },
+    "mouth": [423.33, 133.33],
+    "body": [[350.0, 73.33], [483.33, 73.33], [500.0, 566.67], [333.33, 566.67]]
+  },
+  { "figure": "ben", "face_exclusion": { "cx": 736.67, "cy": 93.33, "r": 46.67 } }
+],
+"backdrop": {
+  "image": {
+    "...": "...",
+    "keep_out": [[[133.33, 300.0], [300.0, 300.0], [300.0, 466.67], [133.33, 466.67]]]
+  }
+}
+```
+
+A figure is not an actor: nobody posed it, so it has no transform, no skeleton and nothing to
+draw — the picture draws it, and an emitter draws nothing for it. What it has is what lettering
+worked around. `figure` is its name in the contract; `actor` is the cast member it plays, which a
+balloon's `speaker` and a sound effect's `source` name, and is left out for a figure nobody cast,
+whose face lettering kept clear of just the same. `mouth` is where a tail to it aims, left out when
+the contract declares none, so a tail aims at the face's centre; `body` is left out when it declares
+none. `keep_out` holds what balloons, captions and sound effects paid to cover and were never
+forbidden to. They are resolved numbers, like everything here: change `box` by hand and the picture
+moves, and the figures stay where they were resolved.
+
+A panel with no figures has no `figures` key, and a picture with no keep-out regions no `keep_out`,
+so every Core written before them reads and writes byte for byte as it did, and neither needed a
+`format_version` bump.
+
 An actor with `marks` carries three more fields. `marks` names what was asked for; `emanata` is the
 drawing, in the same `stroke` and `disc` primitives as `face_marks`, with ids numbered per mark
 (`plewd_0`, `plewd_1`, ...); and `emanata_zones` holds one polygon per mark, which is what balloon and
@@ -224,6 +263,49 @@ A panel with no effects has no `sfx` key, so no `format_version` bump.
 `seed` is kept so that a Core document explains itself: two panels with the same masses and
 different skylines differ here, and here is where to look.
 
+A panel read right to left carries `"direction": "rtl"`, the reason its lettering is where it
+is: see [`direction`](language.md#direction). A panel read left to right has no `direction` key,
+so every Core written before it reads, and is written, byte for byte as before — no
+`format_version` bump.
+
+### The staging
+
+What the solver used and once threw away is recorded too, so that an
+[export for image models](../howto/export_for_image_models.md), reading only this tier, can say
+how the panel is staged (#72). From `examples/duel.panel.yaml`, and a backdrop
+set in a street at night:
+
+```json
+"camera": { "shot": "medium_shot", "angle": "eye_level", "reference": "alice", "scale": 1.94,
+            "headroom": 0.1, "footroom": 0.0, "pullback": 0.71 },
+"actors": [{
+  "id": "alice",
+  "joints": { "neck": [96.87, 355.74], "shoulder_l": [31.0, 367.37], "...": "..." },
+  "features": { "eye_l": [58.12, 173.62], "eye_r": [135.62, 173.62], "nose": [96.87, 204.62], "...": "..." },
+  "looking_at": "bob",
+  "...": "..."
+}],
+"backdrop": { "place": "street", "time": "night", "...": "..." }
+```
+
+- **`camera`** is the camera's verdict: the shot asked for and the angle, the puppet it was
+  composed on, the one scale every actor shares, the headroom and footroom as fractions of the
+  panel's height, and `pullback`, below 1 when the camera retreated to fit the cast. A panel whose
+  cast a picture draws has none: the artist framed it.
+- **`joints`** is where every joint of the skeleton landed, by the puppet's name for it. `_l` and
+  `_r` are the sides of the screen in the puppet's rest pose, so on a figure facing left
+  `shoulder_l` is on the right.
+- **`features`** is where each face feature point sits: the anatomy, not the marks, so the same
+  whatever the expression and present when the face is too small to draw.
+- **`looking_at`** is whom the actor looks at — an actor id, or somebody heard from off panel —
+  where `gaze_aim` is the direction.
+- **`place`** names the place the masses are, whether `place:` wrote them or an author wrote the
+  same list out; **`time`** is the hour the values were chosen for, which `atmosphere` records too
+  but only when something is in the air. Over a picture neither is known, and both are left out.
+
+None is read to draw the panel. Each is left out of a document that does not use it, so a Core
+written before them reads and writes back byte for byte — no `format_version` bump.
+
 ### The words
 
 A panel is also read, by somebody who cannot see it, and the words it is read in are resolved here
@@ -238,7 +320,8 @@ like everything else, so the emitter copies them and decides nothing:
 
 - **`description`** is the panel's [`description`](language.md#description) when it has one —
   written, or a comic script's prose — and otherwise generated from what it holds: the shot and
-  angle, the place, the hour and the weather, then each figure left to right, by thirds of the panel
+  angle, the place, the hour and the weather, then each figure in reading order (from the right in
+  a panel read right to left), by thirds of the panel
   at the centre of its face, with its pose, expression and marks, whom it looks at, and whom it
   stands in front of or behind. A panel with nothing in it is `An empty panel.`
 - **`label`**, on every balloon, caption and sound effect, is who says it, how, and the words:
@@ -278,7 +361,8 @@ where each panel's frame is, and nothing drawn:
 }
 ```
 
-`frames` are in reading order: tier by tier, left to right, and down each column of a tier of
+`frames` are in reading order: tier by tier, left to right — right to left, for a page whose
+`direction` is `rtl` — and down each column of a tier of
 columns, with an inset right after the panel it is set into or, for `read: before`, right before
 it. An inset's frame also carries `inset_of`, the panel it sits in, and `clearance`, the area it
 covers with its ring of white; the page paints that white under it. Neither field is written for
@@ -295,6 +379,9 @@ frame in page units and in its own Core in panel units; the frame is the outline
 The panel is drawn clipped to it, and bordered by it. A rectangle has no `outline` key. Each panel's own Core was compiled at
 exactly its frame's `width` and `height`, so a panel's Core reads the same on a page as it would
 alone at that size, and a page adds no layout decision to a panel.
+
+A page read right to left carries `"direction": "rtl"` as its panels do; one read left to right
+has no `direction` key.
 
 `lettering_height` is the one thing every panel on the page shares: the height their type sizes are
 a fraction of, in place of each panel's own. It is recorded so that a Page Core says why two panels

@@ -61,6 +61,7 @@ from scenet.assets.contract import (
 )
 from scenet.core import PageCore, PanelCore
 from scenet.emit.debug_svg import render_debug
+from scenet.emit.export import Conditioning, render_conditioning
 from scenet.emit.page import render_page, render_pages
 from scenet.emit.strip import render_strip
 from scenet.emit.svg import render
@@ -98,6 +99,7 @@ from scenet.ir import (
     CastMember,
     Column,
     Corner,
+    Direction,
     Facing,
     Fit,
     FontSpec,
@@ -176,6 +178,8 @@ __all__ = [
     "parse_script",
     # -- rendering -----------------------------------------------------------
     "render",
+    "render_conditioning",
+    "Conditioning",
     "render_debug",
     "render_page",
     "render_pages",
@@ -193,6 +197,7 @@ __all__ = [
     "CaptionKind",
     "CaptionTone",
     "CastMember",
+    "Direction",
     "Facing",
     "FontSpec",
     "LetteringSpec",

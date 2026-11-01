@@ -31,7 +31,7 @@ env:
 jobs:
   check:
     name: Lint, types and tests (Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -98,7 +98,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -109,13 +109,13 @@ jobs:
 
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -135,14 +135,14 @@ jobs:
 
   licenses:
     name: Dependency licenses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -164,7 +164,7 @@ jobs:
 
   typecheck-strict:
     name: Strict type check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # ty is pre-1.0 and is documented to miss some advanced typing patterns that pyright
     # catches, so this job covers the gap. It used to be `continue-on-error: true`, which
     # meant it failed on every single run while the run itself reported green -- 92
@@ -176,7 +176,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen --all-groups
@@ -184,7 +184,7 @@ jobs:
 
   examples:
     name: Gallery diagnostics
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # The gallery is the language's shop window and the playground's contents. A false
     # positive here would make `scenet check` useless the first time anybody ran it, and
     # a real one means a published example does not compile.
@@ -197,7 +197,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -223,7 +223,7 @@ jobs:
           github.event_name != 'pull_request'
           || github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: results.sarif
           category: scenet-examples
@@ -236,7 +236,7 @@ jobs:
 
   package:
     name: Package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # What `release.yml` checks before it publishes, checked on every pull request
     # instead: a file missing from the wheel or the sdist, or a README PyPI cannot
     # render, would otherwise show only once a tag is pushed. Nothing is published --
@@ -247,7 +247,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -276,7 +276,7 @@ jobs:
 
   typescript:
     name: TypeScript
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # The project rule is TypeScript wherever JavaScript would be used, with strict
     # enabled. That is only meaningful if something checks it.
     steps:
@@ -287,7 +287,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -335,7 +335,7 @@ jobs:
 
   editor-e2e:
     name: Editor end to end
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # The extension in a real VS Code, the oldest `engines.vscode` admits: activation, a
     # check on open and on save, each finding where it belongs, gone once fixed. The unit
     # tests cover what the extension decides; only an editor covers the glue, and the
@@ -348,7 +348,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 

@@ -3,7 +3,8 @@
  *
  * The moving parts, and this file is the only thing that knows about all of them: a
  * Monaco editor (`./scenet-monaco`), a Pyodide-hosted compiler (`./compiler`), the
- * gallery the build inlined into `examples.json`, a zoomable viewer (`./viewport`),
+ * gallery the build inlined into `examples.json` and the order it is shown in
+ * (`./gallery`), a zoomable viewer (`./viewport`),
  * downloads (`./export`), and the draft and share links (`./persist`).
  *
  * No geometry, no layout, no language knowledge beyond telling one document kind from
@@ -23,9 +24,28 @@ import {
   type Compiler,
 } from "./compiler";
 import { exampleFiles } from "./examples";
-import { download, sourceFilename, stemFor, svgBlob, svgToPng, textBlob } from "./export";
+import {
+  CONDITIONING,
+  conditioningFile,
+  download,
+  sourceFilename,
+  stemFor,
+  svgBlob,
+  svgToPng,
+  textBlob,
+} from "./export";
 import { declaredPath, fontFileName } from "./fonts";
-import { declaredImagePath, imageFileName } from "./images";
+import {
+  displayOrder,
+  docHref,
+  exampleHash,
+  exampleIndex,
+  exampleNameFromHash,
+  grouped,
+  neighbours,
+  type Gallery,
+} from "./gallery";
+import { declaredImagePath, imageFileName, isContract } from "./images";
 import {
   browserStore,
   clearDraft,
@@ -68,6 +88,11 @@ interface Example {
   readonly title: string;
   readonly kind: ScenetDocumentKind;
   readonly file: string;
+  readonly group: string;
+  /** One sentence, shown under the editor. */
+  readonly summary: string;
+  /** The page of `docs/` that explains it, as the manifest writes it. */
+  readonly doc: string;
   readonly source: string;
   /** Files it names beside itself, as base64: a picture it is lettered over. */
   readonly files?: Readonly<Record<string, string>>;
@@ -75,8 +100,8 @@ interface Example {
 
 /**
  * Where the text in the editor came from, which decides what the blurb says, what
- * Reset goes back to, and what downloads are called. `index` is a gallery example, or
- * -1 for a restored draft that did not start from one.
+ * Reset goes back to, where Previous and Next go, and what downloads are called. `index`
+ * is a gallery example, or -1 for a restored draft that did not start from one.
  */
 type Origin =
   | { readonly from: "example"; readonly index: number }
@@ -108,6 +133,10 @@ function element<T extends HTMLElement>(id: string): T {
 const workspace = element<HTMLElement>("workspace");
 const editorHost = element<HTMLDivElement>("editor");
 const exampleSelect = element<HTMLSelectElement>("examples");
+const previousButton = element<HTMLButtonElement>("previous");
+const nextButton = element<HTMLButtonElement>("next");
+const summary = element<HTMLSpanElement>("summary");
+const docLink = element<HTMLAnchorElement>("doc-link");
 const blurb = element<HTMLSpanElement>("blurb");
 const resetButton = element<HTMLButtonElement>("reset");
 const shareButton = element<HTMLButtonElement>("share");
@@ -199,15 +228,25 @@ async function main(): Promise<void> {
     sceneSchemaUrl: schemaBase("scene.schema.json"),
   });
 
-  const examples = (await (await fetch(new URL("examples.json", document.baseURI))).json()) as
-    readonly Example[];
+  const gallery = (await (await fetch(new URL("examples.json", document.baseURI))).json()) as
+    Gallery<Example>;
+  const examples = gallery.examples;
+  const start = Math.max(0, gallery.start);
+  const order = displayOrder(gallery);
 
-  examples.forEach((example, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = example.title;
-    exampleSelect.append(option);
-  });
+  // By theme, from the tour. An option's value stays the example's index in the
+  // manifest, which is what a draft remembers.
+  for (const group of grouped(gallery)) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.name;
+    for (const index of group.indices) {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = examples[index]?.title ?? "";
+      optgroup.append(option);
+    }
+    exampleSelect.append(optgroup);
+  }
 
   // One model per document kind, because monaco-yaml associates a schema by matching
   // the model's URI against a filename pattern. Reusing one model would mean a scene
@@ -263,10 +302,12 @@ async function main(): Promise<void> {
   let compiler: Compiler | undefined;
   let lastGood: CompileSuccess | undefined;
   let view: View = "panel";
-  let origin: Origin = { from: "example", index: 0 };
+  let origin: Origin = { from: "example", index: start };
   let edited = false;
   // True while this file, not the person typing, is changing the editor's text.
   let loading = false;
+  // A `#example=` link the page was opened with that names no example: said once compiled.
+  let missingExample: string | undefined;
   // Each compile takes a ticket; a result is shown only if no later compile started.
   let generation = 0;
   let timer: number | undefined;
@@ -446,18 +487,36 @@ async function main(): Promise<void> {
   const originExample = (): Example | undefined =>
     origin.from === "shared" ? undefined : examples[origin.index];
 
+  /** Previous and Next, from wherever the editor's text came from. */
+  const updateWalk = (): void => {
+    const { previous, next } = neighbours(order, origin.from === "shared" ? -1 : origin.index);
+    for (const [button, index, word] of [
+      [previousButton, previous, "Previous"],
+      [nextButton, next, "Next"],
+    ] as const) {
+      const example = index === undefined ? undefined : examples[index];
+      button.disabled = example === undefined;
+      button.title = example === undefined ? `No ${word.toLowerCase()} example` : `${word}: ${example.title}`;
+    }
+  };
+
+  /** Under the editor: what the example shows, where to read about it, and whose text it is. */
   const updateBlurb = (): void => {
     const example = originExample();
-    const path = example === undefined ? "" : `examples/gallery/${example.file}`;
+    summary.textContent = example?.summary ?? "";
+    summary.title = example === undefined ? "" : `examples/gallery/${example.file}`;
+    docLink.hidden = example === undefined;
+    if (example !== undefined) docLink.href = docHref(example.doc);
     if (origin.from === "shared") {
       blurb.textContent = "Opened from a shared link";
     } else if (origin.from === "draft") {
-      blurb.textContent = example ? `Your edit of ${path}, restored` : "Your document, restored";
+      blurb.textContent = example ? "Your edit, restored" : "Your document, restored";
     } else {
-      blurb.textContent = edited ? `${path} · edited` : path;
+      blurb.textContent = edited ? "Edited" : "";
     }
     resetButton.hidden = origin.from === "example" && !edited;
     resetButton.textContent = example ? "Reset to example" : "Back to the gallery";
+    updateWalk();
   };
 
   const setSource = (text: string, kind: ScenetDocumentKind = detectKind(text)): void => {
@@ -477,9 +536,12 @@ async function main(): Promise<void> {
     viewport.fit();
   };
 
-  /** A share link in the address bar is only true until the first edit. */
-  const dropShareLink = (): void => {
-    if (tokenFromHash(location.hash) !== undefined) {
+  /**
+   * A link in the address bar -- a share link, or an example's name -- is only true until
+   * the first edit. Dropping it is also what lets a reload restore the draft.
+   */
+  const dropLink = (): void => {
+    if (tokenFromHash(location.hash) !== undefined || exampleNameFromHash(location.hash) !== undefined) {
       history.replaceState(null, "", location.pathname + location.search);
     }
   };
@@ -488,17 +550,43 @@ async function main(): Promise<void> {
   const mayDiscard = (): boolean =>
     !edited || window.confirm("Discard your changes to this document?");
 
-  const loadExample = (index: number): void => {
+  /**
+   * Open a gallery example, and name it in the address bar so the address links to it.
+   *
+   * Opened from such a link as the page loads, the draft is kept, as it is for a share
+   * link: the visitor never chose to discard it. The first edit replaces it anyway.
+   */
+  const loadExample = (index: number, { keepDraft = false } = {}): void => {
     const example = examples[index];
     if (example === undefined) return;
     setSource(example.source, example.kind);
     origin = { from: "example", index };
     edited = false;
     exampleSelect.value = String(index);
-    clearDraft(store);
-    dropShareLink();
+    if (!keepDraft) clearDraft(store);
+    history.replaceState(null, "", location.pathname + location.search + exampleHash(example.file));
     updateBlurb();
     void compileNow();
+  };
+
+  /** Open the example a `#example=` fragment names; false if it names none the gallery has. */
+  const openNamedExample = (): boolean => {
+    const name = exampleNameFromHash(location.hash);
+    if (name === undefined) return false;
+    const index = exampleIndex(examples, name);
+    if (index === undefined) {
+      missingExample = name;
+      setStatus(`The gallery has no example called ${name}.`);
+      return false;
+    }
+    loadExample(index, { keepDraft: true });
+    return true;
+  };
+
+  /** Previous or Next: the example beside this one, in the order the menu shows. */
+  const walk = (step: "previous" | "next"): void => {
+    const index = neighbours(order, origin.from === "shared" ? -1 : origin.index)[step];
+    if (index !== undefined && mayDiscard()) loadExample(index);
   };
 
   const openSharedLink = async (): Promise<boolean> => {
@@ -522,7 +610,20 @@ async function main(): Promise<void> {
 
   const updateDownloads = (): void => {
     for (const button of downloadMenu.querySelectorAll<HTMLButtonElement>("[data-download]")) {
-      button.disabled = button.dataset["download"] !== "source" && lastGood === undefined;
+      const what = button.dataset["download"] ?? "";
+      if (CONDITIONING.some((exported) => exported.suffix === what)) {
+        // One set of exports per panel: a document of several gets them from the command line.
+        const none = lastGood?.conditioning == null;
+        button.disabled = none;
+        button.title =
+          lastGood === undefined
+            ? "Nothing has compiled yet"
+            : none
+              ? "One panel at a time: `scenet build --conditioning` writes every panel's"
+              : "For image models, as `scenet build --conditioning` writes it";
+        continue;
+      }
+      button.disabled = what !== "source" && lastGood === undefined;
     }
   };
 
@@ -540,6 +641,13 @@ async function main(): Promise<void> {
     if (what === "svg") download(`${stem}.svg`, svgBlob(lastGood.svg));
     if (what === "debug") download(`${stem}.debug.svg`, svgBlob(lastGood.debug));
     if (what === "core") download(`${stem}.core.json`, textBlob(lastGood.core, "application/json"));
+    const exported = lastGood.conditioning?.[what];
+    if (exported !== undefined) {
+      const model = editor.getModel() ?? modelFor("panel");
+      const panel = kindOf(model) === "panel" ? undefined : lastGood.panels[0];
+      const { filename, type } = conditioningFile(stem, what, panel);
+      download(filename, textBlob(exported, type));
+    }
     if (what === "png") {
       setStatus("Rendering PNG…", true);
       try {
@@ -592,7 +700,7 @@ async function main(): Promise<void> {
       edited = true;
       updateBlurb();
     }
-    dropShareLink();
+    dropLink();
     scheduleCompile();
   });
 
@@ -607,8 +715,12 @@ async function main(): Promise<void> {
   });
 
   resetButton.addEventListener("click", () => {
-    if (mayDiscard()) loadExample(origin.from === "shared" ? 0 : Math.max(0, origin.index));
+    if (!mayDiscard()) return;
+    loadExample(origin.from === "shared" || examples[origin.index] === undefined ? start : origin.index);
   });
+
+  previousButton.addEventListener("click", () => walk("previous"));
+  nextButton.addEventListener("click", () => walk("next"));
 
   shareButton.addEventListener("click", () => void share());
 
@@ -653,13 +765,20 @@ async function main(): Promise<void> {
     }
     imageInput.value = "";
     if (added.length === 0) {
-      setStatus("A picture must be a .png or .jpg file.");
+      setStatus("A picture must be a .png or .jpg file, and its artwork contract a .art.yaml.");
       return;
     }
     await compileNow();
+    const picture = added.find((path) => !isContract(path));
+    const contract = added.find((path) => isContract(path));
+    const how =
+      picture !== undefined
+        ? `Letter over it with setting: {image: ${picture}}.`
+        : `Its picture goes beside it, named after it; cast its figures with figure:.`;
     setStatus(
-      `Added ${added.join(", ")}. Letter over it with setting: {image: ${added[0]}}. ` +
-        "Pictures stay in this tab only: a reload or a share link does not keep them.",
+      `Added ${added.join(", ")}. ${how}` +
+        (picture !== undefined && contract !== undefined ? " Cast its figures with figure:." : "") +
+        " Pictures stay in this tab only: a reload or a share link does not keep them.",
     );
   };
   addImageButton.addEventListener("click", () => imageInput.click());
@@ -711,7 +830,11 @@ async function main(): Promise<void> {
 
   // A link pasted into this tab's address bar changes only the fragment.
   window.addEventListener("hashchange", () => {
-    if (tokenFromHash(location.hash) !== undefined && mayDiscard()) void openSharedLink();
+    if (tokenFromHash(location.hash) !== undefined) {
+      if (mayDiscard()) void openSharedLink();
+    } else if (exampleNameFromHash(location.hash) !== undefined) {
+      if (mayDiscard()) openNamedExample();
+    }
   });
 
   // --- Start -------------------------------------------------------------------------
@@ -720,8 +843,10 @@ async function main(): Promise<void> {
   // takes ten to twenty seconds on a first visit, and an empty editor for that long
   // reads as a broken page.
 
+  // A share link first, then an example named in the address, then the draft, and
+  // otherwise the gallery's opening example.
   updateDownloads();
-  if (!(await openSharedLink())) {
+  if (!(await openSharedLink()) && !openNamedExample()) {
     const draft = loadDraft(store);
     if (draft !== undefined && draft.source.trim() !== "") {
       setSource(draft.source);
@@ -731,7 +856,7 @@ async function main(): Promise<void> {
       else exampleSelect.value = String(draft.example);
       updateBlurb();
     } else {
-      loadExample(0);
+      loadExample(start);
     }
   }
   render();
@@ -751,6 +876,9 @@ async function main(): Promise<void> {
   // compile: a restored draft or a shared link may name one as well as the example does.
   for (const file of exampleFiles(examples)) compiler.addFile(file.path, file.bytes);
   await compileNow();
+  if (missingExample !== undefined) {
+    setStatus(`The gallery has no example called ${missingExample}, so this opened instead.`);
+  }
 }
 
 void main();

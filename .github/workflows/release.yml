@@ -15,13 +15,13 @@ jobs:
   # burned for good.
   verify:
     name: Verify the tag is releasable
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -50,13 +50,13 @@ jobs:
   build:
     name: Build distributions
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -81,7 +81,7 @@ jobs:
   extension:
     name: Package the VS Code extension
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,13 +115,13 @@ jobs:
   site:
     name: Build the documentation site
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
 
@@ -151,7 +151,7 @@ jobs:
   publish:
     name: Publish to PyPI
     needs: [build, extension, site]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # Skipped until the repository variable PYPI_TRUSTED_PUBLISHER is "true".
     #
     # A trusted publisher has to be registered on pypi.org through a web form -- there
@@ -185,7 +185,7 @@ jobs:
       # Attestations (PEP 740) are on by default: each artifact is signed via Sigstore
       # with this workflow's identity, so anyone can verify the file on PyPI was built
       # here and not uploaded from somebody's laptop.
-      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
 
   github-release:
     name: Create the GitHub release
@@ -202,7 +202,7 @@ jobs:
       && needs.site.result == 'success'
       && needs.publish.result != 'failure'
       && needs.publish.result != 'cancelled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write # to create the release
     steps:

@@ -61,7 +61,8 @@ so always check.
 - **Two figures need a left-to-right order**, from `at:` or from an explicit
   `a left_of b`. There is no unordered "beside".
 - **Script order is reading order.** A balloon may never sit above-and-left of the one
-  before it, so write the lines in the order they are read.
+  before it (above-and-right in a manga, `direction: rtl`), so write the lines in the order
+  they are read.
 - **Shots are named** — `medium_shot`, `close_up` — never a percentage of the panel.
 - **Prose in a comic script is kept and never interpreted.** Staging that matters goes
   in the front matter.
@@ -378,7 +379,8 @@ to: a picture's values are the artist's.
 
 **Nothing else moves.** The picture costs a balloon nothing. The compiler does not know what is in
 it, so a balloon may sit anywhere on it; the cast's faces are what lettering keeps clear of. The
-camera frames the cast exactly as it would in front of masses.
+camera frames the cast exactly as it would in front of masses. When the people are in the picture,
+its artwork contract says where — see [Figures the picture draws](#figures-the-picture-draws).
 
 **Linked or embedded.** The SVG names the picture by the path exactly as written, percent-encoded,
 so it is found when the SVG sits beside the document — which is where `scenet build` writes it.
@@ -393,6 +395,66 @@ accessible name and has no title of its own. A generated description names neith
 the hour over a picture — the compiler has not seen it — only the weather it drew. Write
 `description:` to say what the picture shows.
 
+### Figures the picture draws
+
+A picture can draw its own people. Cast them with `figure:` in place of `reference:`, and Scenet
+letters them as it letters puppets — balloons in reading order, never over a face, tails to the
+mouth — while drawing nothing of them: the picture already has.
+
+```yaml
+setting: {image: art/p01-street.png}
+cast:
+  ana: {figure: ana}          # in place of reference:
+  ben: {figure: ben}
+script:
+  - say: {by: ana, text: "Where are we?"}
+  - say: {by: ben, text: "Somewhere they won't look."}
+```
+
+Where each face, mouth and body is, the panel does not say — it never writes a coordinate. The
+picture's [artwork contract](https://creatoan.github.io/scenet/reference/asset_contract.html#artwork-contracts) does: a file beside the picture,
+named after it, `art/p01-street.art.yaml`, measured once in the picture's own pixels and
+committed with it. `figure:` names a figure it declares. The contract is read only for a panel
+whose cast names a figure, and its geometry goes through the picture's `fit`, so a face is
+excluded exactly where the picture draws it, under `cover` and `contain` alike.
+
+**Everybody the contract declares is in the picture.** A face nobody cast is as forbidden to
+lettering as a speaker's, and a body as costly to cover: a crowd of five can be declared and two of
+them cast. The other way round, a cast figure the panel's picture does not draw is simply not in
+that panel — as a member written `(OP)` is not — so a script's front matter or a scene's defaults
+can cast every figure of a chapter, and each panel holds those its own picture draws. A line spoken
+there by one it does not draw is `unknown-figure`, listing who the picture does draw; that is where
+a misspelt name is caught. A figure in a panel with no picture is `unknown-figure` too.
+
+**What does not apply.** The artist already framed, posed and staged everybody in the picture:
+
+- **No camera.** The shot is whatever the picture shows. `camera:` on a panel whose cast is all
+  figures is refused, as `figure-staging`, a key with no effect; a panel that inherits one writes
+  `camera: null`. A generated description says no shot.
+- **No staging.** A relation naming a figure — `left_of`, `looking_at` and the rest — is refused,
+  as `figure-staging`.
+- **No posing.** `pose`, `expression`, `marks`, `at` and `facing` are a puppet's, and refused beside
+  `figure`, as is `reference`: a member is one or the other (`conflicting-cast`). A member inherited
+  as a puppet becomes a figure with `reference: null` beside its `figure`.
+- **No gaze.** A contract declares none, so nothing keeps a balloon out of a figure's line of sight.
+- **No mixed casts.** A cast is all puppets or all figures (`conflicting-cast`): staging and the
+  camera would place a puppet over a painted face they cannot see. One figure is one person, played
+  by one member.
+
+**Keep-out regions** in the contract are ground lettering pays to cover, weighted as emanata are —
+a sign, a hand, what the panel is about — and never forbidden: a crowded panel covers one before it
+fails.
+
+**A `cover` crop** can push a face or a mouth out of the panel. Lettering stays inside the panel as
+always, and a face is kept clear for whatever part of it is in view. A tail to a mouth cropped
+away ends on the frame, aimed at it, and `scenet build` says so in a note; `fit: contain` shows the
+whole picture.
+
+`scenet check` reads the contract without running the solver, and reports a missing or malformed one
+as `artwork-contract`: in the contract itself, at the line of the fault, when the document is checked
+as a file; at the line naming the picture when it is checked as text, as in the playground or over
+MCP. The debug overlay (`scenet build --debug`) draws every face, mouth, body and keep-out over the
+panel, which is how a contract is checked against its picture.
 
 ## `cast`
 
@@ -401,6 +463,7 @@ A mapping of actor id to properties. Ids are chosen by the author and referenced
 | Key | Type | Meaning |
 |---|---|---|
 | `reference` | asset name | Which puppet to pull from the library |
+| `figure` | figure name | Instead of `reference`: a figure the panel's picture draws, as its [artwork contract](https://creatoan.github.io/scenet/reference/asset_contract.html#artwork-contracts) names it. See [Figures the picture draws](#figures-the-picture-draws) |
 | `pose` | pose name | A named joint configuration declared by that puppet |
 | `expression` | expression name | A named face declared by that puppet |
 | `marks` | list of marks | Emanata drawn around the character: `plewds`, `squeans`, `grawlixes`, `briffits` |
@@ -463,6 +526,9 @@ have been drawn, and a character too small to have a face has no marks at all. S
 
 An oath written in a balloon — `"@#$%!"` — is dialogue, and already works. `grawlixes` is the other
 convention, the symbols over a head.
+
+A cast member may instead be a figure the panel's picture draws, written `figure:`; see
+[Figures the picture draws](#figures-the-picture-draws) for what applies to it and what does not.
 
 `reference`, `pose` and `expression` are validated against the puppet library, not just against the
 language's own grammar — a misspelled pose is a perfectly good string as far as the grammar is
@@ -548,7 +614,8 @@ script:
 A speaker who is not drawn has no mouth to point at, so their balloon's tail ends on the frame,
 on their side — Blambot: "the tail of the balloon generally butts against the panel border". Name
 the side, or write `off_panel: true` and the compiler takes the nearer of left and right to where it
-put the balloon. Top and bottom are only ever named: balloons sit high, so "the nearest edge" would
+put the balloon — which it puts high on the side reading starts from, top left, or top right in a
+comic read right to left. A side you name is a side of the panel, whichever way it is read. Top and bottom are only ever named: balloons sit high, so "the nearest edge" would
 aim most tails at the top border, which reads as a speaker above.
 
 An off-panel speaker is somebody nobody draws, so `by` is any name and must **not** be in the
@@ -587,7 +654,7 @@ to do. Comics solved this long before they had reliable backgrounds.
 | `text` | string | What the box says. Line breaking is computed, as for dialogue |
 | `kind` | `locale`, `monologue`, `spoken`, `editorial` | What the box is doing |
 | `tone` | `paper`, `pale`, `ink` | What the box is filled with. Defaults to `paper` |
-| `prefer` | zone | Where it would like to sit. Defaults to `top_left` |
+| `prefer` | zone | Where it would like to sit. Unwritten, where reading starts: `top_left`, or `top_right` read right to left |
 | `by` | any name | Who is speaking, for a `spoken` caption only |
 
 The four kinds are the letterers' own vocabulary, taken from Blambot's *Comic Book Grammar &
@@ -654,7 +721,8 @@ the first non-neutral value in the codebase, and there is no colour policy to pu
 **Text is set flush left.** This is a *convention*, not a rule the way reading order is: the
 lettering references describe left alignment as the norm while calling it a house preference. It is
 the default because it is what letterers do, and it is recorded here as a choice rather than a law —
-unlike `shot_types.md`, which is normative. Balloons, by contrast, centre their text.
+unlike `shot_types.md`, which is normative. Balloons, by contrast, centre their text. Both hold
+in a comic read right to left: its text still reads left to right.
 
 Captions are placed by the same machinery as balloons — the same face avoidance, the same silhouette
 occlusion cost, the same hard reading-order rule — because the placement principles for floating
@@ -745,7 +813,8 @@ exclamations, and no emphasis — an underscore here is just an underscore.
 ### Reading order is enforced, not suggested
 
 Balloons and captions are placed in script order, in one pass, and a box may never sit
-above-and-left of the one before it. Violating this is not a cosmetic flaw: it makes the panel read
+above-and-left of the one before it — above-and-*right*, in a comic read right to left (see
+[`direction`](#direction)). Violating this is not a cosmetic flaw: it makes the panel read
 in the wrong order, which is a correctness bug in a comic. The constraint is therefore hard, and a
 panel whose boxes cannot be placed without breaking it is rejected rather than rendered wrongly.
 
@@ -754,7 +823,8 @@ written between two lines of dialogue is read between them; one written last is 
 
 A sound effect takes its number in the same sequence — which is the order a reader of the text, or a
 screen reader, follows — but is exempt from the geometric rule. A sound sits where the sound is, and
-holding it to above-and-left would make many panels impossible to letter.
+holding it to above-and-left would make many panels impossible to letter. Read right to left, it
+stays exempt, and stays where it was: a sound is part of the picture, which is not mirrored.
 
 That sequence is what a screen reader hears. Every SVG names each panel with its
 [description](#description) and then every balloon, caption and sound effect in this order —
@@ -871,11 +941,61 @@ forms and the contextual substitution that picks one, which only a full text sha
 Scenet applies no glyph substitution at all, so a face that picks its crossbar "I" contextually will
 not pick it here either. Write in capitals if you want them.
 
+## `direction`
+
+Which way the comic is read: `ltr`, from the top left, as Western comics are, or `rtl`, from the
+top right, as manga are. It is the comic's **progression**, not the direction of its text: a manga
+translated into English still reads right to left, while the words in each balloon read left to
+right. Vertical Japanese lettering is not part of it.
+
+```yaml
+direction: rtl
+cast:
+  hana: {reference: alice, at: right_third, facing: left}
+  ken: {reference: bob, at: left_third}
+script:
+  - say: {by: hana, text: You came.}
+  - say: {by: ken, text: You called.}
+```
+
+| Key | Means | Default |
+|---|---|---|
+| `direction` | `ltr` or `rtl` | `ltr` |
+
+The words are EPUB's, whose `page-progression-direction` says the same thing about a book. Like
+EPUB's, it is said **once, for the whole document**: at the top of a single panel, beside
+`panels:` in a scene, where every panel inherits it, or in a comic script's front matter. A panel
+may not have one of its own — a page read one way holding a panel read the other has no order a
+reader could follow — so a panel under `panels:` that writes `direction`, even the document's
+own, and a script's `@direction:` are reported as `panel-direction`.
+
+Only what reading decides follows it. **The scene is never mirrored**: figures, gaze, staging, the
+camera, tails and sound effects stay exactly as staged, and every word that names a place on the
+panel means the same place either way — `at:`, `left_of`, `facing:`, `prefer:`, a side for
+`off_panel`, an inset's corner. Panel Core and Page Core record `direction` when it is `rtl`.
+
+What follows it, in a panel:
+
+- **[Reading order](#reading-order-is-enforced-not-suggested)**: a box may never sit above and
+  *right* of one before it.
+- **Where an unplaced box would rather start**: a caption with no `prefer`, and a voice from
+  [off panel](#off-panel-speech) with no side named, go top right — where reading starts.
+- **Every tiebreak reading decides.** When two places cost exactly the same, the one tried first
+  wins, and right to left they are tried in the mirrored order. So the mirror image of a panel,
+  read right to left, is lettered as the exact mirror of the original read left to right.
+- **The description** names the cast in reading order, from the right; "left" and "right" still
+  say where each one stands.
+
+And on a [page](#page-and-pages): each tier's panels from the right, the pages of a document side
+by side from the right, and a strip from the right — each still written in reading order, the
+order a screen reader follows.
+
 ## `page` and `pages`
 
 A scene can lay its panels out on pages. `pages:` is a list of pages; each page is a list of
-**tiers**, top to bottom; each tier is a list of panels, left to right. `page:` is the format they
-share.
+**tiers**, top to bottom; each tier is a list of panels, in reading order — left to right, or right
+to left for a comic read that way. `page:` is the
+format they share.
 
 A comic script's pages are its `PAGE` headings instead; its front matter takes `page:` but
 not `pages:`. See [Write a panel as a comic script](https://creatoan.github.io/scenet/howto/write_a_comic_script.html#pages).
@@ -987,8 +1107,18 @@ both `panels` and `columns` or neither, two stacks side by side, two insets that
 too big for its panel, a slant that cannot apply or is too steep, or margins and gutters that leave
 no room are reported as `page-layout`.
 
-Not yet: frames of any other shape, such as round panels or ones without borders; right-to-left
-reading ([#68](https://github.com/creatoan/scenet/issues/68)), comic-script `PAGE` headings as pages
+**Read right to left.** With [`direction: rtl`](#direction), the same page is read from the top
+right. Panels are still written in reading order, so the first panel of a tier is at its right and
+the last at its left; the first column of a tier of columns is at the right, and each column is
+still read top to bottom — a stack beside a tall panel is read down before across, on the right.
+Each frame is exactly the one a left-to-right page gives that panel with the tier written the other
+way round, so every panel keeps its size, and its art is the art it has read left to right. What
+names a place on the page keeps naming it: an inset's `at:` is a corner of its parent, and a
+positive `slant` leans the top of each gutter right, as written. A layout one direction refuses, the
+other refuses too.
+
+Not yet: frames of any other shape, such as round panels or ones without borders; comic-script
+`PAGE` headings as pages
 ([#75](https://github.com/creatoan/scenet/issues/75)), and print sizes with trim and bleed
 ([#80](https://github.com/creatoan/scenet/issues/80)).
 
@@ -1517,6 +1647,10 @@ Everything in the front matter is a default every panel inherits — exactly the
 mechanism as [shared defaults in a sequence](https://creatoan.github.io/scenet/howto/compile_a_sequence.html#shared-defaults) — and so a
 `description`, which says what one panel shows, is refused there.
 
+`direction: rtl` there makes the whole script read from the top right, as a manga does; see
+[`direction`](https://creatoan.github.io/scenet/reference/language.html#direction). It is the script's, never one panel's, so
+`@direction:` under a PANEL heading is refused.
+
 Note the actor ids are written in caps here, to match the speaker cues. That is a
 convention, not a requirement; the ids simply have to agree.
 
@@ -1601,10 +1735,20 @@ The puppets shipped with Scenet. A cast member's `reference` names one of these,
 
 One puppet may appear several times in a panel under different actor ids. Your own puppets are described in [the asset contract](https://creatoan.github.io/scenet/reference/asset_contract.html).
 
+## Figures a picture draws
+
+A cast member may instead be `figure: <name>`: somebody a supplied picture (`setting.image`) already draws. No tool lists them, because they are not Scenet's: the names are those the picture's artwork contract declares, in the `*.art.yaml` beside it and named after it (`art/p01.png` has `art/p01.art.yaml`). Over MCP, send the contract in `files` with the picture. A figure takes no `pose`, `expression`, `marks`, `at` or `facing`, no staging names it, and a panel whose cast is all figures has no `camera`; a cast does not mix figures and puppets. See [the artwork contract](https://creatoan.github.io/scenet/reference/asset_contract.html#artwork-contracts) and the gallery's `35-figures.scene.yaml`.
+
 <!-- scenet-spec:part=diagnostics -->
 # Diagnostics
 
 Every rule `scenet check` can report. Each finding carries one of these ids, a message naming the offending construct, and a line and column. The ids are stable across releases.
+
+### `scenet/artwork-contract`
+
+A picture's artwork contract cannot be read. A panel that casts a figure a supplied picture draws reads the picture's artwork contract, beside it and named after it: `art/p01.png` has its contract at `art/p01.art.yaml`. It must be there, and be YAML holding the picture's `size`, its `figures` and its `keep_out` regions, in the picture's own pixels. The size must be the picture's, every point must lie on the picture, and every region must be a simple polygon. A fault inside the contract is reported in it, when the document was checked as a file.
+
+**Fix:** Put the contract beside its picture with the picture's name, measure it on this picture, and check it against `scenet schema --artwork`. The debug overlay (`scenet build --debug`) draws what it declares over the panel.
 
 ### `scenet/balloon-placement`
 
@@ -1623,6 +1767,12 @@ A caption that is not `spoken` names a speaker. `by` names who says an off-panel
 An `over:` chain cannot be resolved. A panel inherits from one that does not exist, or the chain is cyclic and so has no fixed point to resolve to.
 
 **Fix:** Check the panel name in `over:` and that the chain terminates.
+
+### `scenet/conflicting-cast`
+
+A cast member is a puppet and a figure, or a cast mixes the two. A cast member is a puppet Scenet poses (`reference`) or a figure a supplied picture draws (`figure`), never both. Nobody poses or places a figure, so a puppet's `pose`, `expression`, `marks`, `at` and `facing` do not apply to one. A cast is all puppets or all figures, since staging and the camera would place a puppet over a painted face they cannot see; and one figure is one person, played by one cast member.
+
+**Fix:** Keep `reference` or `figure`. On a member inherited from a scene's defaults, write the other as `null`, and the same for a puppet's keys.
 
 ### `scenet/conflicting-setting`
 
@@ -1647,6 +1797,12 @@ A key is written twice in one mapping. YAML requires every key in a mapping to b
 Two panels in a comic script have the same name. Panels are named by their PANEL heading, and by their PAGE heading as well when panel numbers start again on each page. Two panels that still share a name -- PANEL 1 twice on one page, or twice with no PAGE heading between them -- cannot both be kept, and dropping one without a word would lose whatever it held.
 
 **Fix:** Number the panels straight through, or put a PAGE heading before each page whose numbering starts again.
+
+### `scenet/figure-staging`
+
+Staging or a camera for figures a picture draws. The artist already framed, placed and staged everybody a picture draws, so a staging relation naming a figure has nothing to place, and a `camera` on a panel whose cast is all figures has nothing to frame: the shot is whatever the picture shows. Either would be a key with no effect, and this language reports slips.
+
+**Fix:** Remove the relation, or the `camera`. On a panel that inherits a camera, write `camera: null`.
 
 ### `scenet/font-file`
 
@@ -1720,6 +1876,12 @@ A comic script's PAGE heading states a count its panels do not match. Dark Horse
 
 **Fix:** Correct the count, or the panel heading that was not read as one.
 
+### `scenet/panel-direction`
+
+A panel names a reading direction of its own. `direction` says which way the whole comic is read -- `ltr` from the top left, `rtl` from the top right, as manga are -- so it is written once for the document: beside `panels:` in a scene, in a comic script's front matter. A page read one way holding a panel read the other has no order a reader could follow, so a panel under `panels:` that writes `direction`, even the document's own, and a script's `@direction:`, are refused.
+
+**Fix:** Delete it from the panel, and write `direction` once for the whole document.
+
 ### `scenet/panel-geometry`
 
 The panel has no usable area. Panel dimensions must be positive, and the margins must leave something between them. A panel with no interior has nothing to compose in.
@@ -1761,6 +1923,12 @@ Reference to an actor that is not in the cast. Every actor id named in `staging`
 Reference to an expression the character does not have. A cast member's `expression` names one its puppet does not declare. The counterpart of `unknown-pose`: an expression is selected by name exactly as a pose is.
 
 **Fix:** Check the name against the puppet's declared expressions.
+
+### `scenet/unknown-figure`
+
+A figure the panel's picture does not draw. A cast member's `figure` names a figure in the artwork contract of the panel's picture. A panel with no picture has nobody for a figure to be. A figure its picture does not declare is simply not in that panel, as a member written `(OP)` is not; a line spoken by it there, or a sound made by it, is reported, with the figures the picture does draw.
+
+**Fix:** Check the name against the contract's `figures`, name the picture with `setting.image`, or say the line from off panel, leaving the member out of this panel's cast.
 
 ### `scenet/unknown-key`
 
@@ -1853,7 +2021,7 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
     },
     "CaptionEvent": {
       "additionalProperties": false,
-      "description": "One caption box: the panel speaking in its own voice.\n\nA caption is what lets a panel say where and when it happens without a character\nhaving to explain it out loud. `MIDNIGHT. THE DOCKS.` in the corner does the work\nof an establishing shot with no artwork at all, which is how comics established\nplace long before they had reliable backgrounds.\n\nAttributes:\n    verb: Always `caption`, written as `- caption: {...}`.\n    text: What the box says. As with dialogue, line breaking is computed, and a\n        word between underscores is stressed.\n    kind: What the box is doing, which decides how it is set.\n    tone: What the box is filled with. Defaults to `paper`, the white every caption\n        has been since captions shipped, so no existing panel moves.\n    prefer: Where it would like to sit. Defaults to `top_left`, which is where a\n        `locale` caption conventionally goes.\n    by: Who is speaking, for a `spoken` caption only.\n\n**A caption is not a fifth balloon kind.** It has no speaker to point at and no\ntail, and :attr:`CoreBalloon.tail <scenet.core.CoreBalloon.tail>` is required -- a\nfifth kind would mean inventing a speaker and leaving a field dead.\n\n`by` is the one place where the rule that every actor id resolves does not hold,\nand deliberately: an off-panel speaker is not in the panel, so requiring them to be\nin the cast would defeat the point of saying they are off panel.\n\nExample:\n    >>> from scenet.ir import CaptionEvent\n    >>> CaptionEvent(text=\"Midnight. The docks.\").kind.value\n    'locale'",
+      "description": "One caption box: the panel speaking in its own voice.\n\nA caption is what lets a panel say where and when it happens without a character\nhaving to explain it out loud. `MIDNIGHT. THE DOCKS.` in the corner does the work\nof an establishing shot with no artwork at all, which is how comics established\nplace long before they had reliable backgrounds.\n\nAttributes:\n    verb: Always `caption`, written as `- caption: {...}`.\n    text: What the box says. As with dialogue, line breaking is computed, and a\n        word between underscores is stressed.\n    kind: What the box is doing, which decides how it is set.\n    tone: What the box is filled with. Defaults to `paper`, the white every caption\n        has been since captions shipped, so no existing panel moves.\n    prefer: Where it would like to sit, a place on the panel. Unwritten, it is\n        `None`, and the caption sits where a `locale` caption conventionally goes:\n        where reading starts, `top_left`, or `top_right` in a comic read right to left.\n    by: Who is speaking, for a `spoken` caption only.\n\n**A caption is not a fifth balloon kind.** It has no speaker to point at and no\ntail, and :attr:`CoreBalloon.tail <scenet.core.CoreBalloon.tail>` is required -- a\nfifth kind would mean inventing a speaker and leaving a field dead.\n\n`by` is the one place where the rule that every actor id resolves does not hold,\nand deliberately: an off-panel speaker is not in the panel, so requiring them to be\nin the cast would defeat the point of saying they are off panel.\n\nExample:\n    >>> from scenet.ir import CaptionEvent\n    >>> CaptionEvent(text=\"Midnight. The docks.\").kind.value\n    'locale'",
       "properties": {
         "by": {
           "anyOf": [
@@ -1872,8 +2040,15 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
           "default": "locale"
         },
         "prefer": {
-          "$ref": "#/$defs/PlacementZone",
-          "default": "top_left"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlacementZone"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "minLength": 1,
@@ -1914,44 +2089,160 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
     },
     "CastMember": {
       "additionalProperties": false,
-      "description": "One character present in the panel.\n\nAttributes:\n    reference: Name of a puppet in the library. This is what gets drawn; the key\n        this member is filed under in `cast` is the actor id used everywhere else.\n    pose: Named pose from that puppet's declared set.\n    expression: Named expression from that puppet's declared set. Selected by name\n        exactly as a pose is, because a face is the same kind of thing as a body:\n        a small closed set of arrangements the character can be in.\n    marks: Emanata drawn around the character -- sweat, dizziness, swearing, a\n        hasty exit. A list, because they compose with each other and with the\n        expression. Kept sorted, so the order they were written in never\n        changes the output.\n    at: Preferred horizontal anchor.\n    facing: Which way the figure is turned.\n\nThe split between actor id and `reference` is what lets one puppet appear twice in\na panel as two different people:\n\n    cast:\n      guard_left:  {reference: bob, pose: arms_crossed}\n      guard_right: {reference: bob, pose: standing_neutral, facing: left}",
+      "anyOf": [
+        {
+          "required": [
+            "reference"
+          ]
+        },
+        {
+          "required": [
+            "figure"
+          ]
+        }
+      ],
+      "description": "One character present in the panel: a puppet Scenet poses, or a figure a picture draws.\n\nAttributes:\n    reference: Name of a puppet in the library. This is what gets drawn; the key\n        this member is filed under in `cast` is the actor id used everywhere else.\n        None for a figure.\n    pose: Named pose from that puppet's declared set.\n    expression: Named expression from that puppet's declared set. Selected by name\n        exactly as a pose is, because a face is the same kind of thing as a body:\n        a small closed set of arrangements the character can be in.\n    marks: Emanata drawn around the character -- sweat, dizziness, swearing, a\n        hasty exit. A list, because they compose with each other and with the\n        expression. Kept sorted, so the order they were written in never\n        changes the output.\n    at: Preferred horizontal anchor.\n    facing: Which way the figure is turned.\n    figure: Instead of `reference`: a figure the panel's supplied picture draws, by\n        the name its artwork contract gives it (#71). Nobody poses or places it --\n        the artist did -- so none of the keys above applies to it, and every one\n        is refused beside it.\n\nThe split between actor id and `reference` is what lets one puppet appear twice in\na panel as two different people:\n\n    cast:\n      guard_left:  {reference: bob, pose: arms_crossed}\n      guard_right: {reference: bob, pose: standing_neutral, facing: left}",
+      "if": {
+        "properties": {
+          "figure": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "figure"
+        ]
+      },
+      "not": {
+        "properties": {
+          "figure": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "figure"
+        ]
+      },
       "properties": {
         "at": {
-          "$ref": "#/$defs/AnchorX",
-          "default": "center"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnchorX",
+              "default": "center"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "expression": {
-          "default": "neutral",
-          "title": "Expression",
-          "type": "string"
+          "anyOf": [
+            {
+              "default": "neutral",
+              "title": "Expression",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "facing": {
-          "$ref": "#/$defs/Facing",
-          "default": "right"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Facing",
+              "default": "right"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "figure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure"
         },
         "marks": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/Mark"
-          },
-          "title": "Marks",
-          "type": "array"
+          "anyOf": [
+            {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/Mark"
+              },
+              "title": "Marks",
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "pose": {
-          "default": "standing_neutral",
-          "title": "Pose",
-          "type": "string"
+          "anyOf": [
+            {
+              "default": "standing_neutral",
+              "title": "Pose",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "reference": {
-          "title": "Reference",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
         }
       },
-      "required": [
-        "reference"
-      ],
+      "then": {
+        "properties": {
+          "at": {
+            "type": "null"
+          },
+          "expression": {
+            "type": "null"
+          },
+          "facing": {
+            "type": "null"
+          },
+          "marks": {
+            "type": "null"
+          },
+          "pose": {
+            "type": "null"
+          }
+        }
+      },
       "title": "CastMember",
       "type": "object"
+    },
+    "Direction": {
+      "description": "Which way a comic is read: its progression, not the direction of its text.\n\n`ltr` reads from the top left, as Western comics do; `rtl` from the top right, as manga\ndo -- the panels on a page and in a strip, the pages side by side, and the balloons and\ncaptions in a panel. The words in a balloon are not touched: a manga translated into\nEnglish still reads right to left while each line reads left to right.\n\nIt is the whole document's, written once, as EPUB's `page-progression-direction` is per\nbook, whose words these are. Only what reading decides follows it. The scene is never\nmirrored: figures, gaze, staging, tails and sound effects stay as staged, and every\nword that names a place on the panel -- `at:`, `left_of`, `facing:`, `prefer:`, a side\nfor `off_panel`, an inset's corner -- means the same place either way.",
+      "enum": [
+        "ltr",
+        "rtl"
+      ],
+      "title": "Direction",
+      "type": "string"
     },
     "Facing": {
       "description": "Which way an actor is turned.\n\nMirroring the whole puppet, gaze vector included. Defaults to `right`, so a cast\nwritten left to right ends up looking into the panel rather than out of it.",
@@ -2601,7 +2892,7 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
+  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
   "properties": {
     "camera": {
       "$ref": "#/$defs/CameraSpec",
@@ -2637,6 +2928,11 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
       "default": null,
       "description": "What the panel shows, in words, for a reader who cannot see it. Carried into the SVG as its accessible name and never interpreted. Not inherited: a panel drawn `over:` another is a different picture. Left out, one is generated from the shot, the setting and the cast.",
       "title": "Description"
+    },
+    "direction": {
+      "$ref": "#/$defs/Direction",
+      "default": "ltr",
+      "description": "Which way the comic is read: `ltr` from the top left, `rtl` from the top right, as manga are -- panels, pages and the balloons in a panel. Its progression, not its text: the words in a balloon still read left to right. Written once for the whole document; the scene is never mirrored."
     },
     "lettering": {
       "$ref": "#/$defs/LetteringSpec",
@@ -2728,9 +3024,11 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
 <!-- scenet-spec:part=gallery -->
 # Gallery
 
-Every example the playground offers, in the order it offers them. The test suite compiles each one, so all of them are known to work.
+Every example the playground offers, in the order the gallery's manifest lists them. The test suite compiles each one, so all of them are known to work.
 
 ## Two characters
+
+The panel from the README: two actors, who stands where, who looks at whom, and two lines of dialogue.
 
 `01-two-characters.panel.yaml`
 
@@ -2759,6 +3057,8 @@ script:
 ```
 
 ## The shot ladder
+
+Every shot type from long shot to extreme close-up, each defined by where it crops the body and how much headroom it leaves.
 
 `02-shot-ladder.scene.yaml`
 
@@ -2803,6 +3103,8 @@ panels:
 
 ## Camera angles
 
+The three camera heights at one shot type, told apart by the air they leave above the head.
+
 `03-camera-angles.scene.yaml`
 
 ```yaml
@@ -2828,6 +3130,8 @@ panels:
 ```
 
 ## Every balloon kind
+
+Speech, whisper, shout and thought, each with the outline a letterer would give it.
 
 `04-balloon-kinds.panel.yaml`
 
@@ -2860,6 +3164,8 @@ script:
 
 ## Placement zones
 
+A balloon may prefer one of nine zones, the weakest rule there is: the compiler overrules it before it covers a face.
+
 `05-placement-zones.panel.yaml`
 
 ```yaml
@@ -2887,7 +3193,9 @@ script:
   - say: {by: alice, text: "Bottom right.", prefer: bottom_right}
 ```
 
-## Reading order is a hard rule
+## Reading order
+
+Balloons are placed so the page reads in script order, as a hard rule rather than a preference.
 
 `06-reading-order.panel.yaml`
 
@@ -2921,7 +3229,9 @@ script:
   - say: {by: bob,   text: "Fourth."}
 ```
 
-## Gaze steers the balloons
+## Gaze steers balloons
+
+Who looks at whom moves nobody, only the balloons: the space in front of the eyes is costly to cover.
 
 `07-gaze.panel.yaml`
 
@@ -2956,6 +3266,8 @@ script:
 
 ## Feet align, heads do not
 
+Characters of different heights share a ground line, so their feet line up and their heads do not.
+
 `08-ground-and-height.panel.yaml`
 
 ```yaml
@@ -2986,6 +3298,8 @@ script:
 ```
 
 ## Depth and overlap
+
+One character drawn in front of another, the depth that lets two figures share space on purpose.
 
 `09-depth.panel.yaml`
 
@@ -3024,6 +3338,8 @@ script:
 
 ## The camera retreats
 
+Four characters too wide for a close-up make the camera step back, and a note says by how much.
+
 `10-crowd-pullback.panel.yaml`
 
 ```yaml
@@ -3060,7 +3376,9 @@ script:
   - say: {by: dave,  text: "Looks like it."}
 ```
 
-## Poses, facing, and one puppet twice
+## Poses and facing
+
+All four shipped poses, facing either way, and one puppet cast as two characters.
 
 `11-poses.panel.yaml`
 
@@ -3093,7 +3411,9 @@ staging:
   - c ground_shared_with d
 ```
 
-## A sequence, by sparse override
+## A sequence
+
+Panels that follow one another, each written as what changes from the panel before.
 
 `12-sequence.scene.yaml`
 
@@ -3136,7 +3456,9 @@ panels:
       - say: {by: bob, text: "Fine. Talk.", kind: shout}
 ```
 
-## Written as a comic script
+## A comic script
+
+The same kind of panel written as a comic script, in the plain-text form writers already use.
 
 `13-comic-script.script`
 
@@ -3176,7 +3498,9 @@ ALICE (shouting)
 You what?!
 ```
 
-## How lines get broken
+## How lines break
+
+Long lines are broken where a letterer would break them, measured against the real font.
 
 `14-lettering.panel.yaml`
 
@@ -3209,7 +3533,9 @@ script:
   - say: {by: alice, text: "It has been raining since six this morning and you knew that."}
 ```
 
-## Margins, and bleeding off the edge
+## Margins and bleed
+
+A margin keeps the lettering in, while the actors may bleed off the edge.
 
 `15-margin.panel.yaml`
 
@@ -3241,7 +3567,9 @@ script:
   - say: {by: bob,   text: "Only just."}
 ```
 
-## Captions: where and when
+## Captions
+
+Locale, monologue, spoken and editorial captions, placed like balloons but drawn to the corners.
 
 `16-captions.panel.yaml`
 
@@ -3280,6 +3608,8 @@ script:
 ```
 
 ## Ten expressions
+
+Every expression the shipped puppets have, one panel each.
 
 `17-expressions.scene.yaml`
 
@@ -3338,7 +3668,9 @@ panels:
       bob:   {expression: scared}
 ```
 
-## A face, at last
+## A face
+
+A big close-up, where the head fills the panel and the face is drawn in full.
 
 `18-a-face.panel.yaml`
 
@@ -3363,7 +3695,9 @@ cast:
 # reaction panel is what a letterer would have drawn here anyway.
 ```
 
-## Masses, planes and the value ladder
+## Masses and planes
+
+The masses a place is made of, written by hand, on planes whose value reads as distance.
 
 `19-setting.scene.yaml`
 
@@ -3420,7 +3754,9 @@ panels:
       - caption: {text: "Indoors, at dusk.", kind: locale}
 ```
 
-## Ten places, by name
+## Ten places
+
+The ten named places, one panel each, each a backdrop composed from masses.
 
 `20-places.scene.yaml`
 
@@ -3459,7 +3795,9 @@ panels:
   mountain: {setting: {place: mountain, time: dawn}}
 ```
 
-## Time of day, and weather
+## Time and weather
+
+One place at different times of day and in different weather.
 
 `21-atmosphere.scene.yaml`
 
@@ -3522,7 +3860,9 @@ panels:
       - caption: {text: "December.", kind: locale, prefer: top_left}
 ```
 
-## Caption tones, and what they read against
+## Caption tones
+
+Three caption tones, over the pale noon sky that shows why a caption box needs one.
 
 `22-caption-tones.panel.yaml`
 
@@ -3562,7 +3902,9 @@ script:
   - caption: {text: "Continued next issue.", kind: editorial, tone: ink, prefer: bottom_right}
 ```
 
-## Emanata: sweat, dizziness, oaths and dust
+## Emanata
+
+Sweat, dizziness, oaths and dust drawn round a character, and the balloons that make room for them.
 
 `23-emanata.scene.yaml`
 
@@ -3637,7 +3979,9 @@ panels:
       - say: {by: alice, text: "Bob?"}
 ```
 
-## A page: panels in tiers
+## A page in tiers
+
+Panels laid out on a page in tiers, each panel compiled at the size of its frame.
 
 `24-page.scene.yaml`
 
@@ -3704,7 +4048,9 @@ panels:
       - say: {by: bob, text: "Shall we?", kind: whisper}
 ```
 
-## A tall panel beside a stack: columns
+## Columns
+
+A tall panel beside a stack of smaller ones.
 
 `25-columns.scene.yaml`
 
@@ -3780,7 +4126,9 @@ panels:
       - say: {by: bob, text: "Very funny."}
 ```
 
-## Insets: a panel set into another
+## Insets
+
+A small panel set into the corner of another, read before it or after it as it says.
 
 `26-insets.scene.yaml`
 
@@ -3857,7 +4205,9 @@ panels:
       - say: {by: bob, text: "Then we watch the next one."}
 ```
 
-## Slanted tiers: gutters that lean
+## Slanted tiers
+
+Tiers whose gutters lean, and the panels cut to fit them.
 
 `27-slant.scene.yaml`
 
@@ -3926,7 +4276,9 @@ panels:
       alice: {reference: alice, expression: angry, facing: left}
 ```
 
-## Emphasis: a stressed word in bold italic
+## Emphasis
+
+A stressed word lettered in bold italic, as letterers mark it.
 
 `28-emphasis.panel.yaml`
 
@@ -3958,7 +4310,9 @@ script:
   - say: {by: bob,   text: "You said it _might_."}
 ```
 
-## Type size: one size, set for the whole page
+## Type size
+
+One type size set for the whole page, so a short tier and a tall one letter alike.
 
 `29-type-size.scene.yaml`
 
@@ -4004,7 +4358,9 @@ panels:
       - say: {by: alice, text: "Then let me in faster."}
 ```
 
-## Sound effects: letters that are part of the picture
+## Sound effects
+
+Sounds lettered as part of the picture, turned, bent and hollow, with the balloons settling round them.
 
 `30-sound-effects.panel.yaml`
 
@@ -4042,7 +4398,9 @@ script:
   - say: {by: bob, text: "Nothing. Go back to sleep."}
 ```
 
-## Written as Dark Horse asks: title page, counts, CAP and CAP/NAME
+## A Dark Horse script
+
+A script in the format Dark Horse asks for: a title page, counts, and captions written CAP and CAP/NAME.
 
 `31-dark-horse.script`
 
@@ -4098,7 +4456,9 @@ CAP/MAYA
 “-- and that was how the harbour got its light back.”
 ```
 
-## Off-panel speech: a tail to the frame, for somebody nobody draws
+## Off-panel speech
+
+Speech from somebody nobody draws, with a tail that runs to the edge of the frame.
 
 `32-off-panel.scene.yaml`
 
@@ -4135,7 +4495,9 @@ panels:
       - say: {by: caller, text: "I know you're there.", off_panel: true}
 ```
 
-## A French script: planche, cases, récitatif, pensée, hors champ, the échelle des plans
+## A French script
+
+A script written in French: planche, cases, récitatif, pensée, hors champ and the échelle des plans.
 
 `33-planche.script`
 
@@ -4185,7 +4547,9 @@ Ce n'était pas moi.
 ONOMATOPÉE : FLOP
 ```
 
-## A picture drawn elsewhere, behind the cast: cover and contain
+## A picture behind the cast
+
+A picture painted elsewhere behind the puppets, fitted to cover the panel or contained in it.
 
 `34-supplied-art.scene.yaml`
 
@@ -4236,4 +4600,374 @@ panels:
     setting: {fit: contain, weather: clear}
     script:
       - say: {by: alice, text: "It looks smaller from here."}
+```
+
+## Figures a picture draws
+
+People the picture draws, lettered from its artwork contract: balloons keep off their faces and tails find their mouths.
+
+`35-figures.scene.yaml`
+
+It names `art/figures.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+
+```yaml
+# Figures a picture draws, lettered over (#71).
+#
+# The people are in the picture -- art/figures.png, painted by
+# scripts/make_gallery_figures.py -- so the cast names them with `figure:` instead of
+# posing puppets. Where each face, mouth and body is lives in the picture's artwork
+# contract, art/figures.art.yaml, beside it and named after it; this document writes no
+# coordinate. Balloons keep off every declared face, Carl's too though nobody cast him,
+# tails aim at each speaker's mouth, and the timetable board is a keep-out: lettering
+# pays to cover it, and does not.
+#
+# Nobody is posed, placed or framed: the artist did all of that, so there is no camera
+# and no staging. `fit` maps the contract through the same transform as the picture.
+
+cast:
+  ana: {figure: ana}
+  ben: {figure: ben}
+
+setting: {image: art/figures.png, time: night}
+
+panels:
+  platform:
+    panel: {size: [1200, 600]}
+    setting: {fit: cover}
+    script:
+      - caption: {text: "The last train. Again.", kind: locale}
+      - say: {by: ana, text: "Is it always this late?"}
+      - say: {by: ben, text: "Only when it rains somewhere else."}
+
+  waiting:
+    over: platform
+    panel: {size: [600, 700]}
+    setting: {fit: contain}
+    script:
+      - say: {by: ana, text: "Is that ours?"}
+      - say: {by: ben, text: "No."}
+```
+
+Its picture's artwork contract, `art/figures.art.yaml`, beside the picture:
+
+```yaml
+# The artwork contract for figures.png, written by scripts/make_gallery_figures.py
+# from the same constants the picture is painted from. Pixels, from the top left.
+size: [900, 600]
+figures:
+  ana:
+    face: {center: [230, 250], radius: 56}
+    mouth: [230, 273]
+    body: [[168, 296], [292, 296], [316, 600], [144, 600]]
+  ben:
+    face: {center: [410, 236], radius: 60}
+    mouth: [410, 261]
+    body: [[340, 286], [480, 286], [502, 600], [318, 600]]
+  carl:
+    face: {center: [720, 300], radius: 46}
+    mouth: [720, 319]
+    body: [[668, 338], [772, 338], [786, 600], [654, 600]]
+keep_out:
+  # The timetable board.
+  - [[560, 60], [860, 60], [860, 200], [560, 200]]
+```
+
+## Right to left
+
+A page read from the top right, as manga are, where reading order decides everything and the art is never mirrored.
+
+`36-right-to-left.scene.yaml`
+
+```yaml
+# A manga page, read from the top right.
+#
+# `direction: rtl` is the whole document's, written once beside `panels:`. The panels are
+# written in reading order, as on any page, and read right to left: `arrival` is top right,
+# the stack beside the tall street is read down before across, and the last tier ends at
+# the bottom left. In each panel the balloons are read the same way -- never above and right
+# of one before -- and the caption, given no zone, sits where reading starts.
+#
+# Nothing in the picture is mirrored: Hana stands where `at:` puts her and faces the way
+# `facing:` says, the clock is in the corner its `at:` names, and the sound sits where the
+# sound is. 37-left-to-right.scene.yaml is this page read left to right, figure for figure.
+
+direction: rtl
+page: {size: [1500, 2250], margin: 75, gutter: 30, tier_gutter: 45}
+setting: {place: street, time: night, weather: rain}
+
+pages:
+  - tiers:
+      - panels: [{use: arrival, width: 2}, door]
+      - height: 1.4
+        columns:
+          - {panels: [asks, answers]}
+          - width: 1.2
+            panels:
+              - use: street
+                insets: [{use: clock, at: bottom_left, size: 0.4}]
+      - panels: [phone, wait]
+
+panels:
+  arrival:
+    camera: {shot: long_shot}
+    cast:
+      hana: {reference: alice, pose: pointing, at: right_third, facing: left}
+      ken: {reference: bob, at: left_third}
+    staging: [ken left_of hana, hana looking_at ken]
+    script:
+      - caption: {text: "Shinjuku. Ten past midnight."}
+      - say: {by: hana, text: "You came."}
+      - say: {by: ken, text: "You called."}
+
+  door:
+    camera: {shot: medium_close_up}
+    cast:
+      ken: {reference: bob, at: center}
+    script:
+      - say: {by: ken, text: "Is anybody else coming?", kind: whisper}
+
+  asks:
+    camera: {shot: close_up}
+    cast:
+      hana: {reference: alice, at: center, facing: left}
+    script:
+      - say: {by: hana, text: "Only us."}
+
+  answers:
+    camera: {shot: close_up}
+    cast:
+      ken: {reference: bob, expression: surprise, at: center}
+    script:
+      - say: {by: ken, text: "Then why the umbrella?"}
+
+  street:
+    camera: {shot: full_shot}
+    cast:
+      hana: {reference: alice, at: right_third, facing: left}
+      ken: {reference: bob, at: left_third}
+    staging: [ken left_of hana]
+    script:
+      - sfx: {text: KRAK, size: medium, prefer: top_center}
+      - say: {by: hana, text: "Because it is raining."}
+      - say: {by: ken, text: "It always is, here."}
+
+  clock:
+    camera: {shot: long_shot}
+    cast:
+      ken: {reference: bob, expression: sad, at: right_third}
+    script:
+      - caption: {text: "00:10"}
+
+  phone:
+    camera: {shot: medium_shot}
+    cast:
+      hana: {reference: alice, at: center, facing: left}
+    script:
+      - say: {by: mother, text: "Hana? Where are you?", off_panel: true}
+      - say: {by: hana, text: "Nearly home."}
+
+  wait:
+    camera: {shot: medium_shot}
+    cast:
+      ken: {reference: bob, pose: arms_crossed, at: center}
+    script:
+      - say: {by: ken, text: "Go. I will wait."}
+```
+
+## The same page, left to right
+
+The right-to-left page read the other way, figure for figure, to compare the two.
+
+`37-left-to-right.scene.yaml`
+
+```yaml
+# The manga page of 36-right-to-left.scene.yaml, read left to right.
+#
+# The same document with `direction: ltr`, which is also what a page with no `direction`
+# reads as. Put the two side by side: every panel draws the same figures, staged the same
+# way, at the same size -- only where each panel sits on the page, and where its lettering
+# sits in it, follows the direction.
+
+direction: ltr
+page: {size: [1500, 2250], margin: 75, gutter: 30, tier_gutter: 45}
+setting: {place: street, time: night, weather: rain}
+
+pages:
+  - tiers:
+      - panels: [{use: arrival, width: 2}, door]
+      - height: 1.4
+        columns:
+          - {panels: [asks, answers]}
+          - width: 1.2
+            panels:
+              - use: street
+                insets: [{use: clock, at: bottom_left, size: 0.4}]
+      - panels: [phone, wait]
+
+panels:
+  arrival:
+    camera: {shot: long_shot}
+    cast:
+      hana: {reference: alice, pose: pointing, at: right_third, facing: left}
+      ken: {reference: bob, at: left_third}
+    staging: [ken left_of hana, hana looking_at ken]
+    script:
+      - caption: {text: "Shinjuku. Ten past midnight."}
+      - say: {by: hana, text: "You came."}
+      - say: {by: ken, text: "You called."}
+
+  door:
+    camera: {shot: medium_close_up}
+    cast:
+      ken: {reference: bob, at: center}
+    script:
+      - say: {by: ken, text: "Is anybody else coming?", kind: whisper}
+
+  asks:
+    camera: {shot: close_up}
+    cast:
+      hana: {reference: alice, at: center, facing: left}
+    script:
+      - say: {by: hana, text: "Only us."}
+
+  answers:
+    camera: {shot: close_up}
+    cast:
+      ken: {reference: bob, expression: surprise, at: center}
+    script:
+      - say: {by: ken, text: "Then why the umbrella?"}
+
+  street:
+    camera: {shot: full_shot}
+    cast:
+      hana: {reference: alice, at: right_third, facing: left}
+      ken: {reference: bob, at: left_third}
+    staging: [ken left_of hana]
+    script:
+      - sfx: {text: KRAK, size: medium, prefer: top_center}
+      - say: {by: hana, text: "Because it is raining."}
+      - say: {by: ken, text: "It always is, here."}
+
+  clock:
+    camera: {shot: long_shot}
+    cast:
+      ken: {reference: bob, expression: sad, at: right_third}
+    script:
+      - caption: {text: "00:10"}
+
+  phone:
+    camera: {shot: medium_shot}
+    cast:
+      hana: {reference: alice, at: center, facing: left}
+    script:
+      - say: {by: mother, text: "Hana? Where are you?", off_panel: true}
+      - say: {by: hana, text: "Nearly home."}
+
+  wait:
+    camera: {shot: medium_shot}
+    cast:
+      ken: {reference: bob, pose: arms_crossed, at: center}
+    script:
+      - say: {by: ken, text: "Go. I will wait."}
+```
+
+## A tour of Scenet
+
+One page lettered over pictures in colour: posed puppets, figures a picture draws, a caption, a thought, a sound and an inset.
+
+`38-tour.scene.yaml`
+
+It names `art/street.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+
+It names `art/figures.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+
+```yaml
+# A tour of Scenet: one page, lettered over pictures in colour.
+#
+# Nothing on this page was drawn by a generative model, and nothing in this file is a
+# coordinate. It says who is in each panel, what they do and what they say, and the
+# compiler works out the rest: where everybody stands, how the camera frames them, and
+# where every balloon, caption and sound goes so that the page reads in order.
+#
+# The pictures were painted elsewhere -- art/street.png and art/figures.png, beside this
+# file. On the street, Alice and Bob are Scenet's own puppets, posed and staged in front
+# of the picture. On the platform, Ana and Ben are people the picture draws: its artwork
+# contract, art/figures.art.yaml, says where their faces and mouths are, and the
+# balloons keep off them. A panel's cast is one or the other, never both.
+#
+# The small panel set into the street is an inset, read after the panel it sits in.
+# Alice's sweat is emanata, drawn round her head; the sound is lettered as part of the
+# picture; her worry is a thought, in a cloud.
+#
+# Pick another example from the menu, or press Next, to see each idea on its own.
+
+page: {size: [1500, 2250], margin: 75, gutter: 30, tier_gutter: 45}
+
+pages:
+  - tiers:
+      - height: 1.3
+        panels:
+          - use: street
+            insets:
+              - {use: worry, at: bottom_right, size: 0.33}
+      - panels: [platform]
+
+panels:
+  street:
+    camera: {shot: long_shot}
+    setting: {image: art/street.png, fit: cover, time: dusk, weather: rain}
+    cast:
+      alice: {reference: alice, pose: pointing, at: left_third, marks: [plewds]}
+      bob:   {reference: bob,   pose: arms_crossed, at: right_third, facing: left}
+    staging:
+      - alice left_of bob
+      - alice looking_at bob
+      - alice ground_shared_with bob
+    script:
+      - caption: {text: "Eight o'clock. Still raining.", kind: locale}
+      - sfx: {text: VROOM, prefer: top_right, size: medium, rotate: -8}
+      - say: {by: alice, text: "That was our bus!"}
+      - say: {by: bob, text: "Then we take the train."}
+
+  worry:
+    camera: {shot: medium_close_up}
+    setting: {image: art/street.png, fit: cover, time: dusk}
+    cast:
+      alice: {reference: alice, expression: scared, facing: left}
+    script:
+      - say: {by: alice, text: "We'll never make it.", kind: thought}
+
+  platform:
+    setting: {image: art/figures.png, fit: cover, time: night}
+    cast:
+      ana: {figure: ana}
+      ben: {figure: ben}
+    script:
+      - caption: {text: "Platform 4. Ten past nine.", kind: locale}
+      - say: {by: ana, text: "Is it always this late?"}
+      - say: {by: ben, text: "Only when it rains somewhere else."}
+```
+
+Its picture's artwork contract, `art/figures.art.yaml`, beside the picture:
+
+```yaml
+# The artwork contract for figures.png, written by scripts/make_gallery_figures.py
+# from the same constants the picture is painted from. Pixels, from the top left.
+size: [900, 600]
+figures:
+  ana:
+    face: {center: [230, 250], radius: 56}
+    mouth: [230, 273]
+    body: [[168, 296], [292, 296], [316, 600], [144, 600]]
+  ben:
+    face: {center: [410, 236], radius: 60}
+    mouth: [410, 261]
+    body: [[340, 286], [480, 286], [502, 600], [318, 600]]
+  carl:
+    face: {center: [720, 300], radius: 46}
+    mouth: [720, 319]
+    body: [[668, 338], [772, 338], [786, 600], [654, 600]]
+keep_out:
+  # The timetable board.
+  - [[560, 60], [860, 60], [860, 200], [560, 200]]
 ```

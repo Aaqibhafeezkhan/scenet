@@ -434,7 +434,6 @@ mutants as before, one renumbered, one new.
 |---|---|---|
 | `emit/svg.py` `fmt` 7, 8 | `rstrip("0")` to `rstrip("XX0XX")`, `rstrip(".")` to `rstrip("XX.XX")` | `rstrip` takes a set of characters, and no number has an `X` in it. |
 | `emit/svg.py` `fmt` 13 | `""` to `"XXXX"` in the set of zeros | A number formatted to fixed places always keeps the digit before its point, so stripping never leaves `""` -- only `"0"` or `"-0"`. |
-| `emit/svg.py` `panel_body` 39 (was `render` 48) | the painter's sort keyed on the whole tuple | `(depth, id)` is already unique: ids are unique among actors and among masses, and no mass shares a depth with an actor -- the backdrop is behind every actor, the foreground in front of all of them -- so the body is never compared. |
 | `emit/svg.py` `_filter_id` 2, 4 | the id for a missing veil changed | Both callers return before asking when there is no veil. |
 | `emit/svg.py` `typeface_of` 2 | `Typeface(regular=metrics)` to `Typeface(regular=None)` | A Core compiled with those `metrics` names their font in `fonts`, and the loop below puts it back as the regular face; shipped metrics are the shipped face either way. |
 | `emit/svg.py` `_tail_shape` 47 | `or 1.0` to `or 2.0` | Used only for a zero-length chord, whose normal is `(0, 0)` whatever it is divided by. |
@@ -461,6 +460,194 @@ Each mutant killed was applied by hand to see its test fail.
 | `emit/svg.py` `image_href` 5 | `quote(href, safe="/")` to `quote(href)` | `/` is already `quote`'s default `safe`. |
 | `emit/svg.py` `image_href` 6 | `safe="/"` to `safe="XX/XX"` | `quote` never escapes a letter, so adding `X` to what it leaves alone changes nothing. |
 | `emit/svg.py` `image_href` 15 | `decode("ascii")` to `decode("ASCII")` | The same codec; Python's codec names are case-insensitive. |
+
+Figures a picture draws (#71) changed `solve/balloons.py` and `solve/sfx.py` -- the speaker
+interface, bystanders, keep-outs, a tail to a cropped mouth -- added `solve/speakers.py` and
+`solve/figures.py`, and drew figures in the debug overlay. Fresh runs from the stack's top
+branch. The first batch never tried a mutant: two `@given` tests written as methods failed
+Hypothesis's `differing_executors` health check in mutmut's clean run, which runs the suite twice
+in one process; every property test is a module function now, as the rest of the suite's are.
+
+- `solve/speakers.py`,
+  [`39483572899`](https://github.com/creatoan/scenet/actions/runs/39483572899): 26 mutants, all
+  killed.
+- `solve/figures.py`,
+  [`39483587638`](https://github.com/creatoan/scenet/actions/runs/39483587638): 52 mutants, all
+  killed.
+- `solve/describe.py`,
+  [`39483600321`](https://github.com/creatoan/scenet/actions/runs/39483600321): 195 mutants, all
+  killed.
+- `emit/*`, [`39483612696`](https://github.com/creatoan/scenet/actions/runs/39483612696): 1589
+  mutants and 11 survivors, exactly the 11 accepted above under the same numbers. The figures in
+  the debug overlay left none.
+- `solve/balloons.py`,
+  [`39483547250`](https://github.com/creatoan/scenet/actions/runs/39483547250): 1335 mutants and
+  51 survivors.
+  - 27 are the 27 accepted above. Two are renumbered: `_score_caption` 55 is now 59, and
+    `_place_off_panel` 87 is now 89.
+  - **Killed in `tests/test_balloons.py`** (`TestTriageForFigures`, `TestASoundInAPanelOfFigures`):
+    - bystanders' bodies dropped from `_score` (23) and `_score_caption` (21, 22), or overwritten
+      rather than summed in `_occlusion_cost` (33);
+    - bystanders not handed to an off-panel balloon (`_place_off_panel` 54, `place_script` 163) or
+      to the sound effects (`place_script` 78);
+    - the sound effects' `inside`, `marks` -- which hold the keep-outs -- and `blocked` dropped
+      (`place_script` 67, 75, 76, 77);
+    - the bottom-right corner candidate (`_candidate_positions` 62-65) and the fallback tail's
+      start (`route_tail` 83). These two had been killed only by golden panels whose balloons sat
+      there before #71's speaker fix moved them.
+  - **Removed:** `_within_frame` 15, 30, 36, 37, 40 and 43 checked whether a mouth was inside the
+    frame first, and walked shapely's result by hand. A convex frame is crossed once by a line to
+    a mouth beyond it and never by one to a mouth inside, so the function now only intersects, and
+    reads the crossing with `shapely.get_coordinates`. Every golden is unchanged.
+- `solve/sfx.py`, [`39483560230`](https://github.com/creatoan/scenet/actions/runs/39483560230):
+  489 mutants and 37 survivors. `solve/sfx.py` arrived after the baseline above and had not been
+  triaged. #71 changed `_cost` and `place_effects`, and their 21 survivors are triaged here:
+  - **18 killed** in `tests/test_sfx.py`: `TestTheCostOfAPosition` pins each term of `_cost`
+    exactly, on a footprint smaller than a mutant's area floor; `TestWhereAnEffectMayGo` holds
+    `place_effects` to an inset elsewhere, a sliver of one, and a shaped panel.
+  - **3 accepted**, below.
+  - The other 16, in `layout_effect` (9), `_ring` (6) and `_candidates` (1), are in code #71 did
+    not change, and were triaged after it. `TestTheShapeOfAnEffect` and
+    `TestWhereAnEffectIsLookedFor` in `tests/test_sfx.py` kill 9: the last pair of letters
+    kerned as every other is (`layout_effect` 10), an arc of one degree bowing the same way as
+    one of thirty (41), the rings round a source at its reach times each factor (`_candidates`
+    16), and every ring starting straight up and going clockwise (`_ring` 5, 8, 10, 16, 21). The
+    other 7 are accepted, below. `solve/sfx.py` is triaged: run
+    [`39497617662`](https://github.com/creatoan/scenet/actions/runs/39497617662), from that
+    branch, left 11 survivors of 489 mutants, exactly the 11 accepted below.
+
+Both files were run again from the triage branch, after the tests and the change to
+`_within_frame`: `solve/balloons.py`,
+[`39491758453`](https://github.com/creatoan/scenet/actions/runs/39491758453), 1317 mutants and 29
+survivors -- the 27 accepted above and the two below; `solve/sfx.py`,
+[`39491774024`](https://github.com/creatoan/scenet/actions/runs/39491774024), 489 mutants and 19
+survivors -- the three below and the 16 still to triage. The numbers below are those runs'.
+
+Each mutant killed was applied by hand to see its test fail.
+
+| Mutant | Change | Why it cannot change an output |
+|---|---|---|
+| `solve/balloons.py` `_within_frame` 29, 31 | `min(points, key=...)` without the key | A convex frame is crossed at most once, so there is never a second point to choose between: the same argument as `_edge_point` 47 and the rest. |
+| `solve/sfx.py` `_cost` 12 | the source term `+=` to `=` | It is the first term, added to the `0.0` the cost starts at. |
+| `solve/sfx.py` `place_effects` 87 | `cost < best[0]` to `<=` | Differs only on an exact tie, which a later candidate would then win. Candidates are placed by trigonometry, so two that look equally good differ in their last bits -- and which way depends on the platform: a test pinning one, with an inset over the middle and its two mirror points left, passed on Windows and failed on Linux. No test can hold a tie that the arithmetic never makes exact. |
+| `solve/sfx.py` `layout_effect` 40 | `arc > 0` to `arc >= 0` for the bow | The bow is read only when the arc is not zero. |
+| `solve/sfx.py` `layout_effect` 52, 55, 56 | `zip(..., strict=True)` loosened or dropped | The steps are built one per character of the same text, so the two are always the same length. |
+| `solve/sfx.py` `layout_effect` 63, 74 | every glyph's height shifted by 1, or by the arc's radius | The shift is the same for every glyph and corner, and the footprint is re-centred on its hull afterwards, which takes it back out: below what the format can show. |
+| `solve/sfx.py` `layout_effect` 153 | the rotation about the hull's centre instead of `(0, 0)` | The hull has just been centred on `(0, 0)`, so the two are the same point. |
+| `solve/sfx.py` `_ring` 19 | `sin(-pi / 2 + a)` to `sin(-pi / 2 - a)` | Both are `-cos(a)`. |
+| `solve/sfx.py` `place_effects` 42 | `distance < radius` to `<=` | Differs only for a footprint exactly tangent to a face. Footprints are glyph outlines placed at candidate centres a ring step apart, which never land at a face's radius exactly; a balloon's own face test is strict for the same reason. |
+
+Right-to-left reading (#68) changed `solve/balloons.py`, `solve/page.py`, `solve/describe.py`,
+`emit/strip.py`, `emit/page.py` and `emit/debug_svg.py`. Fresh runs from the stack's top branch:
+
+- `solve/balloons.py`,
+  [`39836238615`](https://github.com/creatoan/scenet/actions/runs/39836238615): 1356 mutants and
+  40 survivors.
+  - 29 are the 29 accepted above. One more is renumbered: `_place_off_panel` 89 is now 96.
+  - **11 killed** in `tests/test_direction.py`:
+    - which way caption zones are tried (`_caption_positions` 41). The mirror test alone could
+      not tell the two directions apart, since flipping both still mirrors, so
+      `TestTheRuleItself` pins the first zone to where reading starts;
+    - the tolerance of the right-to-left rule (`_reading_order_allows` 4, 5), mirrored from the
+      left-to-right tests;
+    - the direction dropped from the zones, the order and the nearer side of an off-panel balloon
+      (`_place_off_panel` 27, 30, 34, 37, 70, 73) and from a caption's zones (`_place_caption`
+      24, 27). Most of these change a layout only on an exact tie between mirrored candidates,
+      which falls differently by platform and so is never pinned.
+      `TestEveryReadingDecisionIsAskedTheWayThePanelReads` watches every reading decision in a
+      panel read right to left, and requires each to be asked right to left.
+- `solve/page.py`,
+  [`39836251923`](https://github.com/creatoan/scenet/actions/runs/39836251923): 542 mutants and
+  26 survivors, all accepted above:
+  - `_frame` 1, `_fmt` 5 and 6, and `_slanted` 30, 33, 35, 41, 87, 92, 142 and 157, under the
+    same numbers;
+  - the `zip(..., strict=True)` mutants, renumbered to `resolve_frames` 28, 32, 36, 90, 93, 98,
+    137, 140, 145, 159, 163 and 167;
+  - three new ones of the same kind in `_across` (5, 8, 12), which pairs the starts and sizes of
+    one `_split`.
+- `solve/describe.py`,
+  [`39836265688`](https://github.com/creatoan/scenet/actions/runs/39836265688): 203 mutants and
+  2 survivors, accepted below.
+- `emit/*`, [`39836278068`](https://github.com/creatoan/scenet/actions/runs/39836278068): 1643
+  mutants and 20 survivors.
+  - 11 are the 11 accepted above, under the same numbers.
+  - **9 killed** in `tests/test_reading_pages.py` (`TestTwoDirectionsAreRefusedByName`): the
+    refusal of panels or pages read two ways, word for word (`reading_direction` 8, 9;
+    `render_strip` 7, 10, 11; `render_pages` 7, 10, 11), and the default for nothing to lay out
+    (`reading_direction` 11).
+
+Each mutant killed was applied by hand to see its test fail.
+
+| Mutant | Change | Why it cannot change an output |
+|---|---|---|
+| `solve/describe.py` `describe` 8, 10 | the sort key scaled by -2 instead of -1, or 2 instead of 1 | Scaling every face's x by one factor of the same sign keeps their order, and keeps a tie a tie for the id to break. |
+
+The second job of each of those runs, exploring with fresh seeds, found the right-to-left page
+property compiling the reversed scene in full to compare its frames. That scene's lettering is
+read the other way and can find no room where the original did. The property now lays the
+reversed pages out without compiling a panel, since frames cannot depend on lettering, and passes
+300 examples.
+
+The exports for image models (#72) added `emit/conditioning.py`, `emit/pose.py`,
+`emit/boxes.py`, `emit/semantics.py`, `emit/depth.py`, `emit/mask.py` and `emit/export.py`, moved
+the painter's order of `emit/svg.py` into `in_painters_order` (#221: masses past the tenth were
+drawn out of order), and took `traits` out of `solve/describe.py`.
+
+A first triage ran before the stack's review: `emit/*`
+[`40008532976`](https://github.com/creatoan/scenet/actions/runs/40008532976), 2177 mutants and 17
+survivors, which killed `emit/depth.py` `_plane` 2 and 3 (a figure's plane merged with an
+actor's, by `test_a_hand_edited_core_with_figures_and_actors_puts_the_figures_in_front`) and
+`emit/conditioning.py` `_fraction` 1 (`+ 0.0` to `- 0.0`, by
+`test_a_negative_zero_is_written_as_zero`). The review then changed the box clipping, the maps'
+canvas and edges, the mask colours, and the semantics, so `emit/*` was run again from the top of
+the stack. A cached run of it (40031036460) reported 46 mutants and was discarded; the branch's
+`mutants/` caches were deleted and it ran again from nothing:
+
+- `emit/*`, [`40032456101`](https://github.com/creatoan/scenet/actions/runs/40032456101): 2263
+  mutants and 27 survivors.
+  - 10 are the `emit/svg.py` survivors accepted above, under the same numbers. `panel_body` 39,
+    the painter's sort keyed on the whole tuple, is gone with the sort it mutated, and its row
+    with it: `in_painters_order` sorts on depth alone.
+  - **2 killed**:
+    - `emit/mask.py` `colours` 9, a character stepping aside tested at `slot - step` but placed
+      at `slot + step`. The two agree unless a third character holds the slot ahead, so
+      `test_a_character_stepping_aside_never_lands_on_a_colour_already_taken` builds that
+      case: under the mutant two characters share a colour;
+    - `emit/conditioning.py` `fraction_box` 21, `area <= 0.0` to `<= 1.0`, by
+      `test_a_box_smaller_than_a_unit_is_still_a_box`.
+  - 15 accepted below.
+- `solve/describe.py`,
+  [`40008537043`](https://github.com/creatoan/scenet/actions/runs/40008537043): 210 mutants and
+  2 survivors, `describe` 8 and 10, accepted above under the same numbers. The review changed
+  nothing in it.
+
+Each mutant killed was applied by hand to see its test fail.
+
+| Mutant | Change | Why it cannot change an output |
+|---|---|---|
+| `emit/conditioning.py` `to_json` 5 | `ensure_ascii=False` to `ensure_ascii=None` | `json.dumps` only asks whether it is true, and `None` is not. |
+| `emit/mask.py` `mass_colour` 16, 18 | `% 1.0` to `/ 1.0`, or to `% 2.0` | `colorsys.hsv_to_rgb` takes the hue's sixth modulo 6, so a hue and the same hue plus a whole turn give one colour. |
+| `emit/mask.py` `mass_colour` 17 | `index * GOLDEN` to `index / GOLDEN` | `1 / 0.618…` is `1.618…`, one more than `0.618…`, so the two hues differ by `index` whole turns -- the same colour, the golden ratio's own identity. |
+| `emit/mask.py` `slot_of` 5 | `encode("utf-8")` to `encode("UTF-8")` | The same codec; Python's codec names are case-insensitive. |
+| `emit/mask.py` `slot_of` 10 | `int.from_bytes(digest[:8], "big")` without `"big"` | `"big"` is the default since Python 3.11, and the package needs 3.12. |
+| `emit/mask.py` `render_mask` 10, 13, 15; `emit/semantics.py` `render_semantics` 9, 12, 14 | `zip(regions, colours(regions), strict=True)` with `strict` dropped, `None` or `False` | `colours` returns one colour per region it is given, so the two always have one length. |
+| `emit/export.py` `Conditioning.files` 6, 9, 10 | `zip(suffixes, astuple(self), strict=True)` with `strict` dropped, `None` or `False` | `EXPORTS` and `Conditioning` both have five entries, in one order: a test compares every file with its own export. |
+
+The second job of every run, exploring with fresh seeds, passed every property, the new ones for
+the exports included, at 300 examples.
+
+The depth export's receding surfaces (#227) added `recedes` and a ramped `render_depth` to
+`emit/depth.py`, and taught `flat_map` in `emit/conditioning.py` a `Ramp`. Both modules were run
+from the pull request's branch, each from nothing (the totals are every mutant of the module):
+
+- `emit/depth.py`, [`40952714050`](https://github.com/creatoan/scenet/actions/runs/40952714050):
+  81 mutants and 1 survivor, **killed**: `recedes` 25, a ceiling's run checked against `1.0`
+  instead of the top edge, so a horizon less than a unit below the top left it flat.
+  `test_a_ceiling_with_a_horizon_just_below_the_top_still_recedes` sets one at `0.5`; the mutant,
+  applied by hand, fails it.
+- `emit/conditioning.py`,
+  [`40952725859`](https://github.com/creatoan/scenet/actions/runs/40952725859): 188 mutants and 1
+  survivor, `to_json` 5, accepted above under the same number.
 
 ### Exploring with fresh seeds
 

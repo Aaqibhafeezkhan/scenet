@@ -51,7 +51,7 @@
     },
     "CaptionEvent": {
       "additionalProperties": false,
-      "description": "One caption box: the panel speaking in its own voice.\n\nA caption is what lets a panel say where and when it happens without a character\nhaving to explain it out loud. `MIDNIGHT. THE DOCKS.` in the corner does the work\nof an establishing shot with no artwork at all, which is how comics established\nplace long before they had reliable backgrounds.\n\nAttributes:\n    verb: Always `caption`, written as `- caption: {...}`.\n    text: What the box says. As with dialogue, line breaking is computed, and a\n        word between underscores is stressed.\n    kind: What the box is doing, which decides how it is set.\n    tone: What the box is filled with. Defaults to `paper`, the white every caption\n        has been since captions shipped, so no existing panel moves.\n    prefer: Where it would like to sit. Defaults to `top_left`, which is where a\n        `locale` caption conventionally goes.\n    by: Who is speaking, for a `spoken` caption only.\n\n**A caption is not a fifth balloon kind.** It has no speaker to point at and no\ntail, and :attr:`CoreBalloon.tail <scenet.core.CoreBalloon.tail>` is required -- a\nfifth kind would mean inventing a speaker and leaving a field dead.\n\n`by` is the one place where the rule that every actor id resolves does not hold,\nand deliberately: an off-panel speaker is not in the panel, so requiring them to be\nin the cast would defeat the point of saying they are off panel.\n\nExample:\n    >>> from scenet.ir import CaptionEvent\n    >>> CaptionEvent(text=\"Midnight. The docks.\").kind.value\n    'locale'",
+      "description": "One caption box: the panel speaking in its own voice.\n\nA caption is what lets a panel say where and when it happens without a character\nhaving to explain it out loud. `MIDNIGHT. THE DOCKS.` in the corner does the work\nof an establishing shot with no artwork at all, which is how comics established\nplace long before they had reliable backgrounds.\n\nAttributes:\n    verb: Always `caption`, written as `- caption: {...}`.\n    text: What the box says. As with dialogue, line breaking is computed, and a\n        word between underscores is stressed.\n    kind: What the box is doing, which decides how it is set.\n    tone: What the box is filled with. Defaults to `paper`, the white every caption\n        has been since captions shipped, so no existing panel moves.\n    prefer: Where it would like to sit, a place on the panel. Unwritten, it is\n        `None`, and the caption sits where a `locale` caption conventionally goes:\n        where reading starts, `top_left`, or `top_right` in a comic read right to left.\n    by: Who is speaking, for a `spoken` caption only.\n\n**A caption is not a fifth balloon kind.** It has no speaker to point at and no\ntail, and :attr:`CoreBalloon.tail <scenet.core.CoreBalloon.tail>` is required -- a\nfifth kind would mean inventing a speaker and leaving a field dead.\n\n`by` is the one place where the rule that every actor id resolves does not hold,\nand deliberately: an off-panel speaker is not in the panel, so requiring them to be\nin the cast would defeat the point of saying they are off panel.\n\nExample:\n    >>> from scenet.ir import CaptionEvent\n    >>> CaptionEvent(text=\"Midnight. The docks.\").kind.value\n    'locale'",
       "properties": {
         "by": {
           "anyOf": [
@@ -70,8 +70,15 @@
           "default": "locale"
         },
         "prefer": {
-          "$ref": "#/$defs/PlacementZone",
-          "default": "top_left"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlacementZone"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "text": {
           "minLength": 1,
@@ -112,44 +119,160 @@
     },
     "CastMember": {
       "additionalProperties": false,
-      "description": "One character present in the panel.\n\nAttributes:\n    reference: Name of a puppet in the library. This is what gets drawn; the key\n        this member is filed under in `cast` is the actor id used everywhere else.\n    pose: Named pose from that puppet's declared set.\n    expression: Named expression from that puppet's declared set. Selected by name\n        exactly as a pose is, because a face is the same kind of thing as a body:\n        a small closed set of arrangements the character can be in.\n    marks: Emanata drawn around the character -- sweat, dizziness, swearing, a\n        hasty exit. A list, because they compose with each other and with the\n        expression. Kept sorted, so the order they were written in never\n        changes the output.\n    at: Preferred horizontal anchor.\n    facing: Which way the figure is turned.\n\nThe split between actor id and `reference` is what lets one puppet appear twice in\na panel as two different people:\n\n    cast:\n      guard_left:  {reference: bob, pose: arms_crossed}\n      guard_right: {reference: bob, pose: standing_neutral, facing: left}",
+      "anyOf": [
+        {
+          "required": [
+            "reference"
+          ]
+        },
+        {
+          "required": [
+            "figure"
+          ]
+        }
+      ],
+      "description": "One character present in the panel: a puppet Scenet poses, or a figure a picture draws.\n\nAttributes:\n    reference: Name of a puppet in the library. This is what gets drawn; the key\n        this member is filed under in `cast` is the actor id used everywhere else.\n        None for a figure.\n    pose: Named pose from that puppet's declared set.\n    expression: Named expression from that puppet's declared set. Selected by name\n        exactly as a pose is, because a face is the same kind of thing as a body:\n        a small closed set of arrangements the character can be in.\n    marks: Emanata drawn around the character -- sweat, dizziness, swearing, a\n        hasty exit. A list, because they compose with each other and with the\n        expression. Kept sorted, so the order they were written in never\n        changes the output.\n    at: Preferred horizontal anchor.\n    facing: Which way the figure is turned.\n    figure: Instead of `reference`: a figure the panel's supplied picture draws, by\n        the name its artwork contract gives it (#71). Nobody poses or places it --\n        the artist did -- so none of the keys above applies to it, and every one\n        is refused beside it.\n\nThe split between actor id and `reference` is what lets one puppet appear twice in\na panel as two different people:\n\n    cast:\n      guard_left:  {reference: bob, pose: arms_crossed}\n      guard_right: {reference: bob, pose: standing_neutral, facing: left}",
+      "if": {
+        "properties": {
+          "figure": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "figure"
+        ]
+      },
+      "not": {
+        "properties": {
+          "figure": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "figure"
+        ]
+      },
       "properties": {
         "at": {
-          "$ref": "#/$defs/AnchorX",
-          "default": "center"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnchorX",
+              "default": "center"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "expression": {
-          "default": "neutral",
-          "title": "Expression",
-          "type": "string"
+          "anyOf": [
+            {
+              "default": "neutral",
+              "title": "Expression",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "facing": {
-          "$ref": "#/$defs/Facing",
-          "default": "right"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Facing",
+              "default": "right"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "figure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure"
         },
         "marks": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/Mark"
-          },
-          "title": "Marks",
-          "type": "array"
+          "anyOf": [
+            {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/Mark"
+              },
+              "title": "Marks",
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "pose": {
-          "default": "standing_neutral",
-          "title": "Pose",
-          "type": "string"
+          "anyOf": [
+            {
+              "default": "standing_neutral",
+              "title": "Pose",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "reference": {
-          "title": "Reference",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
         }
       },
-      "required": [
-        "reference"
-      ],
+      "then": {
+        "properties": {
+          "at": {
+            "type": "null"
+          },
+          "expression": {
+            "type": "null"
+          },
+          "facing": {
+            "type": "null"
+          },
+          "marks": {
+            "type": "null"
+          },
+          "pose": {
+            "type": "null"
+          }
+        }
+      },
       "title": "CastMember",
       "type": "object"
+    },
+    "Direction": {
+      "description": "Which way a comic is read: its progression, not the direction of its text.\n\n`ltr` reads from the top left, as Western comics do; `rtl` from the top right, as manga\ndo -- the panels on a page and in a strip, the pages side by side, and the balloons and\ncaptions in a panel. The words in a balloon are not touched: a manga translated into\nEnglish still reads right to left while each line reads left to right.\n\nIt is the whole document's, written once, as EPUB's `page-progression-direction` is per\nbook, whose words these are. Only what reading decides follows it. The scene is never\nmirrored: figures, gaze, staging, tails and sound effects stay as staged, and every\nword that names a place on the panel -- `at:`, `left_of`, `facing:`, `prefer:`, a side\nfor `off_panel`, an inset's corner -- means the same place either way.",
+      "enum": [
+        "ltr",
+        "rtl"
+      ],
+      "title": "Direction",
+      "type": "string"
     },
     "Facing": {
       "description": "Which way an actor is turned.\n\nMirroring the whole puppet, gaze vector included. Defaults to `right`, so a cast\nwritten left to right ends up looking into the panel rather than out of it.",
@@ -799,7 +922,7 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
+  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
   "properties": {
     "camera": {
       "$ref": "#/$defs/CameraSpec",
@@ -835,6 +958,11 @@
       "default": null,
       "description": "What the panel shows, in words, for a reader who cannot see it. Carried into the SVG as its accessible name and never interpreted. Not inherited: a panel drawn `over:` another is a different picture. Left out, one is generated from the shot, the setting and the cast.",
       "title": "Description"
+    },
+    "direction": {
+      "$ref": "#/$defs/Direction",
+      "default": "ltr",
+      "description": "Which way the comic is read: `ltr` from the top left, `rtl` from the top right, as manga are -- panels, pages and the balloons in a panel. Its progression, not its text: the words in a balloon still read left to right. Written once for the whole document; the scene is never mirrored."
     },
     "lettering": {
       "$ref": "#/$defs/LetteringSpec",

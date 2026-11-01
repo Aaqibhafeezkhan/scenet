@@ -115,6 +115,8 @@ class TestThePathChangesNothing:
         "13-comic-script.script",
         "31-dark-horse.script",
         "33-planche.script",
+        "35-figures.scene.yaml",
+        "36-right-to-left.scene.yaml",
     )
 
     def _build(self, source: str, out: Path, cwd: Path) -> dict[str, bytes]:

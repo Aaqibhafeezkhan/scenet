@@ -10,14 +10,16 @@ from functools import partial
 from pathlib import Path
 
 from scenet import __version__
+from scenet.assets.artwork import CONTRACT_SUFFIX
 from scenet.diagnostics import Diagnostic, diagnose_file, to_sarif
 from scenet.emit.debug_svg import render_debug
+from scenet.emit.export import EXPORTS
 from scenet.emit.page import render_page
 from scenet.emit.strip import render_strip
 from scenet.emit.svg import render
 from scenet.errors import ScenetError
 from scenet.pipeline import FRONTENDS, Book, compile_book_file
-from scenet.schema import panel_schema, scene_schema
+from scenet.schema import artwork_schema, panel_schema, scene_schema
 
 DESCRIPTION = "Compile a semantic comic-panel description into SVG."
 
@@ -70,6 +72,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--debug",
         action="store_true",
         help="also write a diagnostic overlay showing hulls, face zones, anchors and gaze",
+    )
+    build.add_argument(
+        "--conditioning",
+        action="store_true",
+        help=(
+            "also export each panel's staging for image models: an OpenPose pose, boxes "
+            "with phrases, a depth map, a mask and the semantics, beside its SVG"
+        ),
     )
     build.add_argument(
         "--live-text",
@@ -164,10 +174,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     schema.add_argument("-o", "--output", type=Path, help="write to a file instead of stdout")
-    schema.add_argument(
+    which = schema.add_mutually_exclusive_group()
+    which.add_argument(
         "--scene",
         action="store_true",
         help="emit the multi-panel scene schema instead of the single-panel one",
+    )
+    which.add_argument(
+        "--artwork",
+        action="store_true",
+        help="emit the schema for an artwork contract, the *.art.yaml beside a picture",
     )
 
     mcp = subcommands.add_parser(
@@ -211,7 +227,16 @@ def _refuse_unsupported(paths: Sequence[Path]) -> bool:
             f"scenet: {path}: unsupported extension '{path.suffix}'; expected one of {expected}",
             file=sys.stderr,
         )
-    return bool(refused)
+    # A contract is YAML, and read as a panel it would be a page of unknown keys. It is
+    # checked through a panel that casts its figures, which is what knows its picture.
+    contracts = [path for path in paths if path.name.lower().endswith(CONTRACT_SUFFIX)]
+    for path in contracts:
+        print(
+            f"scenet: {path}: an artwork contract is not a document; it is checked through "
+            "the panel that casts its figures, beside its picture",
+            file=sys.stderr,
+        )
+    return bool(refused or contracts)
 
 
 def run_build(args: argparse.Namespace) -> int:
@@ -322,7 +347,9 @@ def _outputs(book: Book, base: Path, args: argparse.Namespace, *, single: bool) 
 
     A single-panel document writes to the requested name; a sequence suffixes each panel
     with its own name, so the mapping back to source is obvious. A strip needs more than
-    one panel to lay out. Each page goes to `stem.page-<n>.svg`, beside the panels.
+    one panel to lay out. Each page goes to `stem.page-<n>.svg`, beside the panels. The
+    exports for image models are per panel only: a page adds no layout to a panel, and its
+    Page Core says where every frame is.
     """
     outputs: list[_Output] = []
     embed = book.images if args.embed_images else None
@@ -347,6 +374,11 @@ def _outputs(book: Book, base: Path, args: argparse.Namespace, *, single: bool) 
         if args.debug:
             outputs.append(
                 (target.with_name(f"{target.stem}.debug.svg"), partial(render_debug, core))
+            )
+        if args.conditioning:
+            outputs.extend(
+                (target.with_name(f"{target.stem}{suffix}"), partial(export, core))
+                for suffix, export in EXPORTS
             )
 
     if args.strip and len(book.panels) > 1:
@@ -567,7 +599,8 @@ def run_schema(args: argparse.Namespace) -> int:
     """
     if _refuse_directory(args.output):
         return 2
-    schema = scene_schema() if args.scene else panel_schema()
+    which = "artwork" if args.artwork else "scene" if args.scene else "panel"
+    schema = {"panel": panel_schema, "scene": scene_schema, "artwork": artwork_schema}[which]()
     document = json.dumps(schema, indent=2, sort_keys=True) + "\n"
     if args.output is None:
         _print_document(document)

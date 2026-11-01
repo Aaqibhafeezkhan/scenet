@@ -17,7 +17,9 @@ Generated text is **templated English**, and that is its limit: a French script'
 read in French, but the words round its dialogue are English. Every phrase is in a table
 below, keyed by the enum it reads, so a value with no phrase is a test failure rather
 than a gap a reader hears. Nothing depends on a locale, or on the order a set or a dict
-happens to iterate in: the cast is read left to right, ties broken by id.
+happens to iterate in: the cast is read in reading order -- left to right, or right to left
+for a comic read that way -- ties broken by id. Where each stands, "left" or "right", is
+said as it is on the panel either way.
 
 This sees no artwork. Where a figure is comes in as one number, its face's x, the same
 rounded value Panel Core records.
@@ -31,6 +33,7 @@ from scenet.ir import (
     CameraAngle,
     CaptionEvent,
     CaptionKind,
+    Direction,
     Mark,
     MassKind,
     PanelIR,
@@ -43,7 +46,7 @@ from scenet.ir import (
     TypeSize,
     Weather,
 )
-from scenet.places import PLACES, Place
+from scenet.places import Place, place_of
 
 __all__ = [
     "ANGLES",
@@ -59,6 +62,7 @@ __all__ = [
     "labels",
     "name",
     "sentence",
+    "traits",
 ]
 
 #: Each rung of the shot ladder, as a letterer's script would name it.
@@ -238,11 +242,10 @@ def _shot(panel: PanelIR) -> str:
 
 def _place(setting: SettingSpec) -> str:
     """Where, from the masses: a named place's, or indoors or out."""
-    masses = tuple(setting.masses)
-    for place in Place:
-        if PLACES[place] == masses:
-            return PLACE_NAMES[place]
-    return "Indoors" if any(mass.kind in INDOOR for mass in masses) else "Outdoors"
+    place = place_of(setting.masses)
+    if place is not None:
+        return PLACE_NAMES[place]
+    return "Indoors" if any(mass.kind in INDOOR for mass in setting.masses) else "Outdoors"
 
 
 def _setting(setting: SettingSpec) -> str:
@@ -269,15 +272,32 @@ def _where(x: float, width: float) -> str:
     return "centre"
 
 
+def traits(pose: str, expression: str, marks: Sequence[Mark]) -> list[str]:
+    """How a figure stands, its face and its marks, as a description says them.
+
+    What goes without saying -- standing, a neutral face -- is left out. The one phrasing
+    of a figure: the description reads it, and so does the boxes export (#72).
+
+    Example:
+        >>> from scenet.ir import Mark
+        >>> traits("hands_on_hips", "surprise", [Mark.PLEWDS])
+        ['hands on hips', 'surprised', 'sweating']
+        >>> traits("standing_neutral", "neutral", [])
+        []
+    """
+    parts: list[str] = []
+    if pose != _STANDING:
+        parts.append(pose.replace("_", " "))
+    if expression != _NEUTRAL:
+        parts.append(EXPRESSIONS.get(expression, expression.replace("_", " ")))
+    parts.extend(MARKS[mark] for mark in marks)
+    return parts
+
+
 def _figure(panel: PanelIR, actor: str, x: float, width: float) -> str:
     """One figure: where, how they stand, their face, their marks, and whom they face."""
     member = panel.cast[actor]
-    parts = [name(actor), _where(x, width)]
-    if member.pose != _STANDING:
-        parts.append(member.pose.replace("_", " "))
-    if member.expression != _NEUTRAL:
-        parts.append(EXPRESSIONS.get(member.expression, member.expression.replace("_", " ")))
-    parts.extend(MARKS[mark] for mark in member.marks)
+    parts = [name(actor), _where(x, width), *traits(member.pose, member.expression, member.marks)]
     target = panel.gaze_targets().get(actor)
     if target is not None:
         heard = target not in panel.cast
@@ -311,10 +331,18 @@ def describe(panel: PanelIR, faces: Mapping[str, float], width: float) -> str:
     if panel.description is not None:
         return panel.description
     setting = _setting(panel.setting)
-    if not panel.cast:
+    # Only who is drawn: a figure the panel's picture does not draw is not in it (#71).
+    # In reading order: the panel is not mirrored, so right to left is from the far side.
+    sign = -1.0 if panel.direction is Direction.RTL else 1.0
+    cast = sorted(
+        (actor for actor in panel.cast if actor in faces), key=lambda a: (sign * faces[a], a)
+    )
+    if not cast:
         # A picture is not nothing, though nothing can be said of what it shows.
         empty = "A panel with no figures." if panel.setting.image else "An empty panel."
         return setting or empty
-    cast = sorted(panel.cast, key=lambda actor: (faces[actor], actor))
     figures = "; ".join(_figure(panel, actor, faces[actor], width) for actor in cast)
-    return " ".join(part for part in (_shot(panel), setting, f"{figures}.") if part)
+    # The shot of a cast a picture draws is whatever the artist drew, which nobody told
+    # the compiler: no shot is said rather than a default one.
+    shot = "" if panel.drawn_by_its_picture else _shot(panel)
+    return " ".join(part for part in (shot, setting, f"{figures}.") if part)
