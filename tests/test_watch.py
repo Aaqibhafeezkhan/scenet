@@ -1,11 +1,17 @@
 """Tests for dependency tracking and watch mode."""
 
+import shutil
 from collections.abc import Callable
 from pathlib import Path
+
+import fonts.ttf
 
 from scenet import cli
 from scenet.pipeline import compile_book_file
 from scenet.watch import _nearest_existing_directory, snapshot, watch_loop
+from tests.images import contract, png
+
+SEMIBOLD = Path(fonts.ttf.SourceSansProSemibold)  # ty: ignore[unresolved-attribute]  # pyright: ignore[reportAttributeAccessIssue]
 
 PANEL = """cast:
   alice: {reference: alice}
@@ -102,6 +108,19 @@ def test_watch_loop_debounces_quick_writes() -> None:
     assert calls == [2]
 
 
+def test_watch_loop_does_not_rebuild_without_changes() -> None:
+    calls: list[int] = []
+    watch_loop(
+        {Path("source.panel.yaml")},
+        lambda: calls.append(1),
+        wait=lambda _interval, _dependencies: None,
+        take_snapshot=lambda _paths: "constant-snapshot",
+        debounce=0,
+        max_iterations=3,
+    )
+    assert calls == []
+
+
 def test_watch_loop_keeps_watching_dependencies_after_rebuild() -> None:
     dependencies = {Path("source.panel.yaml"), Path("font.ttf")}
     state = {"revision": 0}
@@ -137,18 +156,16 @@ def test_watch_survives_broken_then_fixed_document(tmp_path: Path, monkeypatch) 
     good_svg = source.with_name("watch.svg").read_bytes()
     source.with_name("watch.svg").unlink()
 
-    edits: list[str] = [
-        "not: valid: yaml: {",  # break it
-        PANEL,  # fix it
-    ]
-
     def fake_watch_loop(
         dependencies: set[Path],
         rebuild: Callable[[], object],
     ) -> None:
-        for content in edits:
-            source.write_text(content, encoding="utf-8")
-            rebuild()
+        source.write_text("not: valid: yaml: {", encoding="utf-8")
+        rebuild()
+        # Delete the SVG just before the last rebuild so the check proves a fresh write
+        source.with_name("watch.svg").unlink()
+        source.write_text(PANEL, encoding="utf-8")
+        rebuild()
         assert source.with_name("watch.svg").read_bytes() == good_svg
 
     monkeypatch.setattr(cli, "watch_loop", fake_watch_loop)
@@ -222,34 +239,49 @@ def test_watch_keeps_dependencies_after_failed_build(tmp_path: Path, monkeypatch
 
     cli.main(["build", str(source), "--watch", "--quiet"])
 
-    # The dependency set passed to watch_loop initially has the source
+    # The dependency set passed to watch_loop initially has the source and puppets
     assert source.resolve() in captured_deps[0]
+    assert any(p.name == "alice.puppet.yaml" for p in captured_deps[0])
     # After the failed rebuild, it still includes those same dependencies
-    assert source.resolve() in captured_deps[1]
+    assert captured_deps[0] <= captured_deps[1]
 
 
 def test_watch_triggers_on_right_files(tmp_path: Path) -> None:
-    """The right files trigger a rebuild; unrelated files in the same folder do not."""
+    """The compiler records a font, a picture and an artwork contract that a document names."""
+    fonts_dir = tmp_path / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    font_file = fonts_dir / "Lettering-Regular.ttf"
+    shutil.copy(SEMIBOLD, font_file)
+
+    art_dir = tmp_path / "art"
+    art_dir.mkdir(parents=True, exist_ok=True)
+    img_file = art_dir / "p.png"
+    img_file.write_bytes(png(900, 600))
+    contract_file = art_dir / "p.art.yaml"
+    contract_file.write_bytes(
+        contract(
+            (900, 600),
+            figures={"ana": {"face": {"center": [250, 180], "radius": 50}, "mouth": [255, 210]}},
+        )
+    )
+
+    doc = (
+        "panel: {size: [1200, 600]}\n"
+        "lettering: {font: fonts/Lettering-Regular.ttf}\n"
+        "cast: {ANA: {figure: ana}}\n"
+        "setting: {image: art/p.png}\n"
+        "script: [{say: {by: ANA, text: Hello}}]\n"
+    )
     source = tmp_path / "source.panel.yaml"
-    source.write_text("one", encoding="utf-8")
-    font = tmp_path / "font.ttf"
-    font.write_text("font-data", encoding="utf-8")
-    unrelated = tmp_path / "unrelated.txt"
-    unrelated.write_text("nothing", encoding="utf-8")
+    source.write_text(doc, encoding="utf-8")
 
-    dependencies: set[Path] = {source, font}
+    deps: set[Path] = set()
+    compile_book_file(source, dependencies=deps)
 
-    # Only a change to a dependency triggers the snapshot change
-    snap_before = snapshot(dependencies)
-    source.write_text("two", encoding="utf-8")
-    snap_after = snapshot(dependencies)
-    assert snap_after != snap_before
-
-    # Unrelated file does not change the snapshot
-    snap_unrelated_before = snapshot(dependencies)
-    unrelated.write_text("changed", encoding="utf-8")
-    snap_unrelated_after = snapshot(dependencies)
-    assert snap_unrelated_after == snap_unrelated_before
+    assert source.resolve() in deps
+    assert font_file.resolve() in deps
+    assert img_file.resolve() in deps
+    assert contract_file.resolve() in deps
 
 
 def test_watch_deleted_then_restored_source_rebuilds(tmp_path: Path, monkeypatch) -> None:
@@ -260,21 +292,16 @@ def test_watch_deleted_then_restored_source_rebuilds(tmp_path: Path, monkeypatch
     good_svg = source.with_name("watch.svg").read_bytes()
     source.with_name("watch.svg").unlink()
 
-    edits = [
-        None,  # delete the source
-        PANEL,  # restore it
-    ]
-
     def fake_watch_loop(
         dependencies: set[Path],
         rebuild: Callable[[], object],
     ) -> None:
-        for content in edits:
-            if content is None:
-                source.unlink()
-            else:
-                source.write_text(content, encoding="utf-8")
-            rebuild()
+        source.unlink()
+        rebuild()
+        assert source.resolve() in dependencies
+        source.with_name("watch.svg").unlink()
+        source.write_text(PANEL, encoding="utf-8")
+        rebuild()
         assert source.with_name("watch.svg").read_bytes() == good_svg
 
     monkeypatch.setattr(cli, "watch_loop", fake_watch_loop)
