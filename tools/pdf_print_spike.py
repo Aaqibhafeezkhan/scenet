@@ -22,12 +22,12 @@ PAGE_W = 612.0
 PAGE_H = 792.0
 BLEED = 9.0
 TRIM = (BLEED, BLEED, PAGE_W - BLEED, PAGE_H - BLEED)
-# Fixture: rich-black mass with K-only lettering and border overpinting on top.
-# The mass fill uses overprint OFF so colour plates beneath survive;
+# Fixture: C40 tint mass with K-only lettering and border overprinting on top.
+# The mass fill uses overprint OFF;
 # lettering and the balloon border use overprint ON so they land on K alone.
 FIXTURE = (
     "q\n"
-    "0.4 0 0 1 k\n"
+    "0.4 0 0 0 k\n"
     "72 430 468 210 re f\n"
     "/GSoverprint gs\n"
     "0 0 0 1 k\n"
@@ -113,10 +113,10 @@ def reportlab_pdf() -> bytes:
     doc.setAuthor("Scenet")
     doc.setTrimBox(TRIM)
     doc.setBleedBox((0, 0, PAGE_W, PAGE_H))
-    # Mass fill: rich-black with overprint OFF so colour plates beneath survive
+    # Mass fill: C40 tint with overprint OFF so colour plates beneath survive
     doc.setFillOverprint(0)
     doc.setStrokeOverprint(0)
-    doc.setFillColor(cmyk_color(0.4, 0, 0, 1))
+    doc.setFillColor(cmyk_color(0.4, 0, 0, 0))
     doc.rect(72, 430, 468, 210, fill=1, stroke=0)
     # Lettering and border: K-only with overprint ON
     doc.setFillOverprint(1)
@@ -137,8 +137,8 @@ def inspect_pdf(data: bytes) -> dict[str, bool]:
     text = " ".join(data.decode("latin-1").split())
     return {
         "pdf_header": data.startswith(b"%PDF-"),
-        "trim_box": "/TrimBox [9 9 603 783]" in text,
-        "bleed_box": "/BleedBox [0 0 612 792]" in text,
+        "trim_box": "/TrimBox [9 9 603 783]" in text or "/TrimBox [ 9 9 603 783 ]" in text,
+        "bleed_box": "/BleedBox [0 0 612 792]" in text or "/BleedBox [ 0 0 612 792 ]" in text,
         "k_only_operator": "0 0 0 1 k" in text,
         "overprint_state": "/OP true" in text and "/op true" in text,
         "opm_1": "/OPM 1" in text,

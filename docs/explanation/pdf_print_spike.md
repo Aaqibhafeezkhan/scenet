@@ -45,11 +45,11 @@ reported PDF 1.4 and Letter-size media pages; `pdftotext` extracted the fixture 
 Ghostscript parsed both with `-sDEVICE=nullpage` without errors. Both PDFs exposed the expected
 TrimBox (9, 9, 603, 783), BleedBox (0, 0, 612, 792), CMYK operators and fill/stroke overprint
 state. Two repeated emissions from each backend were byte-identical in the prototype run.
-Direct writer output was 1,202 bytes; ReportLab output was 1,537 bytes. These figures describe
+Direct writer output was 1,111 bytes; ReportLab output was 1,568 bytes. These figures describe
 the fixed fixture, not a production renderer.
 
 **Black-plate check (manual).** To verify that lettering lands on K alone and that colour
-plates beneath it survive, run Ghostscript's `tiffsep` device:
+plates beneath it survive without knockout, run Ghostscript's `tiffsep` device:
 
 ```sh
 gs -dNOPAUSE -dBATCH -sDEVICE=tiffsep \
@@ -57,9 +57,18 @@ gs -dNOPAUSE -dBATCH -sDEVICE=tiffsep \
    /tmp/scenet-direct.pdf
 ```
 
-This writes one TIFF per separation (CMYK). Confirm that the lettering and balloon border
-appear only in `spike-4.tif` (K plate) and that the `C` channel (`spike-1.tif`) shows the
-rich-black mass but no lettering. Tested with Ghostscript 10.x.
+In Ghostscript's `tiffsep` device, `%d` formats the page number rather than the plate. For a
+one-page document, Ghostscript writes the composite as `/tmp/spike-1.tif` and writes one separation
+TIFF per colorant named after the separation: `/tmp/spike-1(Cyan).tif`, `/tmp/spike-1(Magenta).tif`,
+`/tmp/spike-1(Yellow).tif`, and `/tmp/spike-1(Black).tif`. (Alternatively, `-sOutputFile=/tmp/spike.tif`
+produces `/tmp/spike(Cyan).tif`, `/tmp/spike(Black).tif`, etc.).
+
+Tested with Ghostscript 10.04.0:
+- The fixture positions 100% K lettering (`0 0 0 1 k`) over a tint rectangle with no K (a plain C40 tint, `0.4 0 0 0 k`).
+- **Cyan plate (`spike-1(Cyan).tif`)**: Shows the solid 40% cyan rectangular tint block with **no lettering-shaped knockout hole** beneath the lettering, proving that `/OP true` and `/OPM 1` overprinted rather than knocked out the underlying cyan channel.
+- **Black plate (`spike-1(Black).tif`)**: Shows the lettering "SCENET PRINT SPIKE" and the bounding box border in 100% black over an uninked background, confirming the text lands cleanly on K alone.
+- **Magenta (`spike-1(Magenta).tif`) and Yellow (`spike-1(Yellow).tif`) plates**: Completely blank (0% ink), confirming no unintended ink contamination or colour conversion occurred.
+- **Composite (`spike-1.tif`)**: Displays the black lettering and border cleanly over the cyan tint.
 
 This was a structural/parser check, **not PDF/X preflight**. No PDF/X-capable preflight tool
 is available in the execution environment, so conformance, output intent, printer-specific ink
