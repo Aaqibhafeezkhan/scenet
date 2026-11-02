@@ -11,7 +11,7 @@ Four commands: `build` compiles a document, `check` validates one without compil
 ## `scenet build`
 
 ```
-scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--conditioning] [--live-text] [--no-aria] [--embed-images] [--strip] [--quiet]
+scenet build SOURCE [-o OUTPUT] [--core] [--debug] [--conditioning] [--live-text] [--mono] [--no-aria] [--embed-images] [--strip] [--quiet]
 ```
 
 Compiles `SOURCE` to SVG. The frontend is chosen by extension:
@@ -53,6 +53,14 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
   do by default. The default emits outlines, which makes the file genuinely
   self-contained.
 
+`--mono`
+: Draw every value as its grey and ignore its colour: a black-and-white edition of a document
+  drawn in [`palette: tinted`](language.md#palette), made without editing it. Every panel, page and
+  strip is byte-identical to what the same document writes with `palette: mono`, because a
+  palette only ever adds a colour beside a value the compiler had already decided on its grey.
+  Panel Core and the exports for image models are unaffected: `--core` still records the
+  palette and its colours.
+
 `--no-aria`
 : Write no accessibility markup. By default each panel is an image a screen reader can read
   — `role="img"`, named by its `<title>` with what it shows and then everything said in it, in
@@ -76,7 +84,9 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
 
 `--quiet`
 : Suppress the `wrote` and `note:` lines. You do not normally want this: the notes are
-  where the compiler tells you it did something you did not ask for.
+  where the compiler tells you it did something you did not ask for. Each kind has a name,
+  listed with what to do about it in
+  [Work out why a panel looks wrong](../howto/debug_a_layout.md#1-read-the-notes).
 
 ### Output naming
 
@@ -235,7 +245,7 @@ note as information rather than a red squiggle.
 
 | Rule | Level | Raised when |
 |---|---|---|
-| `scenet/syntax` | error | The file is not valid YAML, or is empty |
+| `scenet/syntax` | error | The file is not valid YAML, or is empty; in a comic script, its front matter. A line indented to match no line above it is said to be |
 | `scenet/duplicate-key` | error | A key written twice in one mapping, which YAML would drop silently; in a comic script, a directive written twice in one panel, or `@script:` |
 | `scenet/not-a-mapping` | error | The top level is a list or a scalar |
 | `scenet/unknown-key` | error | A key the language does not define — usually a typo |

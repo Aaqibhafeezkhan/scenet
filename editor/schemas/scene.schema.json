@@ -108,11 +108,12 @@
       "type": "string"
     },
     "CaptionTone": {
-      "description": "The value a caption box is filled with.\n\nA caption box is opaque, so its lettering is never at risk: the text sits on the\nfill whatever is behind it. What a tone changes is whether the *box* reads. On a\nclear day the atmosphere is `#eeeeee` and a white box on it is 1.16:1 -- legible,\nand invisible. The failing case is the pale end, not the dark one.\n\n| Tone | Fill | Where it comes from | Lettered in |\n|---|---|---|---|\n| `paper` | `#ffffff` | the paper the panel is printed on | ink |\n| `pale` | `#adadad` | the `day` row of the value ladder, far plane | ink |\n| `ink` | `#090909` | the `day` row of the value ladder, foreground | paper |\n\n**Drawn from the ladder in `solve/backdrop.py`, not from a second palette.** Two of\nthe three are rungs of it, taken by index rather than restated, which is what keeps\nlettering and backdrop from drifting apart as either is tuned. The `day` row is the\nladder at its widest, so tones taken from it span the most ground.\n\n**A tone is fixed, not a function of the panel's hour.** A caption's value is a\nproperty of the caption; letting it drift with `time` would make the contrast table\na function of the panel and the legibility floor unenforceable.\n\n`ink` produces what letterers call reversed type: the lettering inverts to paper,\nbecause black type on a near-black box is not lettering, it is a filled rectangle.\nWhich mark reads is resolved by the solver -- see\n:attr:`CoreCaption.ink <scenet.core.CoreCaption>` -- exactly as falling rain's is.\n\nThere is no free-form colour here, and no yellow. A `fill:` taking any string would\nbe the language's one open vocabulary and would let an author produce an unreadable\nbox; the classic yellow `locale` caption would be the first non-neutral value in the\ncodebase, and the language has no colour policy yet to put it under.",
+      "description": "The value a caption box is filled with.\n\nA caption box is opaque, so its lettering is never at risk: the text sits on the\nfill whatever is behind it. What a tone changes is whether the *box* reads. On a\nclear day the atmosphere is `#eeeeee` and a white box on it is 1.16:1 -- legible,\nand invisible. The failing case is the pale end, not the dark one.\n\n| Tone | Fill | Where it comes from | Lettered in |\n|---|---|---|---|\n| `paper` | `#ffffff` | the paper the panel is printed on | ink |\n| `pale` | `#adadad` | the `day` row of the value ladder, far plane | ink |\n| `ink` | `#090909` | the `day` row of the value ladder, foreground | paper |\n| `warm` | `#eeeeee` | the `day` row of the value ladder, atmosphere | ink |\n\n**Drawn from the ladder in `solve/backdrop.py`, not from a second palette.** Three of\nthe four are rungs of it, taken by index rather than restated, which is what keeps\nlettering and backdrop from drifting apart as either is tuned. The `day` row is the\nladder at its widest, so tones taken from it span the most ground.\n\n**A tone is fixed, not a function of the panel's hour.** A caption's value is a\nproperty of the caption; letting it drift with `time` would make the contrast table\na function of the panel and the legibility floor unenforceable.\n\n`ink` produces what letterers call reversed type: the lettering inverts to paper,\nbecause black type on a near-black box is not lettering, it is a filled rectangle.\nWhich mark reads is resolved by the solver -- see\n:attr:`CoreCaption.ink <scenet.core.CoreCaption>` -- exactly as falling rain's is.\n\n`warm` is the classic yellow `locale` caption (#244), under the colour policy: its\nvalue is the grey above, and in a palette with colour it is drawn in that grey's twin,\na pale yellow of the same lightness. In `mono` it is the grey, which is what a\nblack-and-white reprint does to a yellow caption. The other three are neutral in every\npalette.\n\nThere is no free-form colour here. A `fill:` taking any string would be the language's\none open vocabulary, and would let an author produce an unreadable box.",
       "enum": [
         "paper",
         "pale",
-        "ink"
+        "ink",
+        "warm"
       ],
       "title": "CaptionTone",
       "type": "string"
@@ -583,6 +584,15 @@
       "title": "PageSpec",
       "type": "object"
     },
+    "Palette": {
+      "description": "What a panel is drawn in: the value ladder in grey, or its twin in colour (#244).\n\n| Palette | What it draws |\n|---|---|\n| `mono` | Every value as the grey it is -- **the default**, and what every panel was |\n| `tinted` | Every value on the ladder in its twin colour: same rung, same hour |\n\n**Colour is a twin of value, never a replacement.** A tinted colour has the OKLab\nlightness of the grey it stands for, so in monochrome a tinted panel is the mono one,\nand every decision the compiler makes from a value -- which rung a mass takes, whether\nrain is inked or papered, how a caption is lettered -- is made on the grey. Panel Core\nkeeps the grey where it always did and adds the colour beside it.\n\nOnly the ladder is tinted: the masses of a setting, the veil and the falling rain.\nSnow, the paper, the figures and all lettering stay as they are in every palette.\n\nA closed set of names, not a colour field, for the reason `CaptionTone` is one: an\nopen colour would be the language's one open vocabulary, and would let a value break\nthe ladder. See :func:`colour_for <scenet.solve.backdrop.colour_for>`.",
+      "enum": [
+        "mono",
+        "tinted"
+      ],
+      "title": "Palette",
+      "type": "string"
+    },
     "PanelPlacement": {
       "anyOf": [
         {
@@ -650,6 +660,36 @@
         }
       },
       "title": "PanelSpec",
+      "type": "object"
+    },
+    "PartialCameraSpec": {
+      "additionalProperties": false,
+      "description": "How the panel is framed.\n\nAttributes:\n    shot: Requested framing; an upper bound on tightness, see\n        :class:`ShotType <scenet.ir.ShotType>`.\n    angle: Camera height, see :class:`CameraAngle <scenet.ir.CameraAngle>`.\n\nThere is exactly **one camera per panel**, and every actor is drawn at the scale it\nimplies. Scaling each actor to its own crop landmark instead would make everybody\nthe same apparent height and erase the body differences a comic uses to tell\ncharacters apart.\n\nIn a scene any of these may be inherited, so none is required here.",
+      "properties": {
+        "angle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CameraAngle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "eye_level"
+        },
+        "shot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ShotType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "medium_shot"
+        }
+      },
+      "title": "CameraSpec",
       "type": "object"
     },
     "PartialCastMember": {
@@ -838,8 +878,15 @@
               "title": "Italic"
             },
             "regular": {
-              "title": "Regular",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Regular"
             }
           },
           "type": "object"
@@ -878,6 +925,52 @@
         }
       },
       "title": "LetteringSpec",
+      "type": "object"
+    },
+    "PartialPanelSpec": {
+      "additionalProperties": false,
+      "description": "The panel's own dimensions.\n\nAttributes:\n    size: `(width, height)` in panel units. Everything else in the language is\n        expressed relative to these, so they set what a unit means.\n    margin: Inset on all four sides. Balloons are kept inside it; actors may bleed\n        past it, which is ordinary comics practice.\n\nExample:\n    >>> from scenet import PanelSpec\n    >>> PanelSpec(size=(1200.0, 600.0)).width\n    1200.0\n\nIn a scene any of these may be inherited, so none is required here.",
+      "properties": {
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0.0,
+          "title": "Margin"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": [
+            1000.0,
+            1000.0
+          ],
+          "title": "Size"
+        }
+      },
+      "title": "PanelSpec",
       "type": "object"
     },
     "PartialSettingSpec": {
@@ -1021,11 +1114,25 @@
           "description": "A named place, which stands for the list of masses it expands into. Write this, `masses` or `image`, never two of them."
         },
         "time": {
-          "$ref": "#/$defs/TimeOfDay",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeOfDay"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": "day"
         },
         "weather": {
-          "$ref": "#/$defs/Weather",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Weather"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": "clear"
         }
       },
@@ -1553,34 +1660,62 @@
   "additionalProperties": false,
   "properties": {
     "camera": {
-      "$ref": "#/$defs/CameraSpec",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PartialCameraSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": {
         "angle": "eye_level",
         "shot": "medium_shot"
       }
     },
     "cast": {
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/PartialCastMember"
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PartialCastMember"
+              },
+              {
+                "description": "Leaves a cast member this panel would inherit out of it, and every staging relation that names them.",
+                "type": "null"
+              }
+            ]
           },
-          {
-            "description": "Leaves a cast member this panel would inherit out of it, and every staging relation that names them.",
-            "type": "null"
-          }
-        ]
-      },
-      "title": "Cast",
-      "type": "object"
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Cast"
     },
     "direction": {
-      "$ref": "#/$defs/Direction",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Direction"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": "ltr",
       "description": "Which way the comic is read: `ltr` from the top left, `rtl` from the top right, as manga are -- panels, pages and the balloons in a panel. Its progression, not its text: the words in a balloon still read left to right. Written once for the whole document; the scene is never mirrored."
     },
     "lettering": {
-      "$ref": "#/$defs/PartialLetteringSpec",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PartialLetteringSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": {
         "font": null,
         "size": null
@@ -1606,8 +1741,27 @@
       "title": "Pages",
       "type": "array"
     },
+    "palette": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Palette"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": "mono",
+      "description": "What the panel is drawn in: `mono`, the value ladder in grey, or `tinted`, each value in a colour with the same lightness. Colour never changes a value, so a tinted panel is, in monochrome, the mono one. Inherited like any default; a panel may have its own."
+    },
     "panel": {
-      "$ref": "#/$defs/PanelSpec",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PartialPanelSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": {
         "margin": 0.0,
         "size": [
@@ -1619,29 +1773,43 @@
     "panels": {
       "additionalProperties": {
         "additionalProperties": false,
-        "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
+        "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n    palette: What the panel is drawn in. A scene's panels inherit it like any default,\n        and unlike `direction` a panel may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
         "properties": {
           "camera": {
-            "$ref": "#/$defs/CameraSpec",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PartialCameraSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": {
               "angle": "eye_level",
               "shot": "medium_shot"
             }
           },
           "cast": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/PartialCastMember"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PartialCastMember"
+                    },
+                    {
+                      "description": "Leaves a cast member this panel would inherit out of it, and every staging relation that names them.",
+                      "type": "null"
+                    }
+                  ]
                 },
-                {
-                  "description": "Leaves a cast member this panel would inherit out of it, and every staging relation that names them.",
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Cast",
-            "type": "object"
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cast"
           },
           "description": {
             "anyOf": [
@@ -1657,7 +1825,14 @@
             "title": "Description"
           },
           "lettering": {
-            "$ref": "#/$defs/PartialLetteringSpec",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PartialLetteringSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": {
               "font": null,
               "size": null
@@ -1667,8 +1842,27 @@
             "description": "Name of a panel to inherit from. Only the differences need stating: mappings merge recursively and lists replace.",
             "type": "string"
           },
+          "palette": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Palette"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "mono",
+            "description": "What the panel is drawn in: `mono`, the value ladder in grey, or `tinted`, each value in a colour with the same lightness. Colour never changes a value, so a tinted panel is, in monochrome, the mono one. Inherited like any default; a panel may have its own."
+          },
           "panel": {
-            "$ref": "#/$defs/PanelSpec",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PartialPanelSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": {
               "margin": 0.0,
               "size": [
@@ -1678,52 +1872,66 @@
             }
           },
           "script": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "say": {
+                          "$ref": "#/$defs/SayEvent"
+                        }
+                      },
+                      "required": [
+                        "say"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "caption": {
+                          "$ref": "#/$defs/CaptionEvent"
+                        }
+                      },
+                      "required": [
+                        "caption"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "sfx": {
+                          "$ref": "#/$defs/SfxEvent"
+                        }
+                      },
+                      "required": [
+                        "sfx"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": [],
-            "items": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "say": {
-                      "$ref": "#/$defs/SayEvent"
-                    }
-                  },
-                  "required": [
-                    "say"
-                  ],
-                  "type": "object"
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "caption": {
-                      "$ref": "#/$defs/CaptionEvent"
-                    }
-                  },
-                  "required": [
-                    "caption"
-                  ],
-                  "type": "object"
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "sfx": {
-                      "$ref": "#/$defs/SfxEvent"
-                    }
-                  },
-                  "required": [
-                    "sfx"
-                  ],
-                  "type": "object"
-                }
-              ]
-            },
-            "title": "Script",
-            "type": "array"
+            "title": "Script"
           },
           "setting": {
-            "$ref": "#/$defs/PartialSettingSpec",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PartialSettingSpec"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": {
               "fit": null,
               "horizon": "mid",
@@ -1734,12 +1942,19 @@
             }
           },
           "staging": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/$defs/Relation"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": [],
-            "items": {
-              "$ref": "#/$defs/Relation"
-            },
-            "title": "Staging",
-            "type": "array"
+            "title": "Staging"
           }
         },
         "type": "object"
@@ -1748,52 +1963,66 @@
       "type": "object"
     },
     "script": {
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "say": {
+                    "$ref": "#/$defs/SayEvent"
+                  }
+                },
+                "required": [
+                  "say"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "caption": {
+                    "$ref": "#/$defs/CaptionEvent"
+                  }
+                },
+                "required": [
+                  "caption"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "sfx": {
+                    "$ref": "#/$defs/SfxEvent"
+                  }
+                },
+                "required": [
+                  "sfx"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": [],
-      "items": {
-        "anyOf": [
-          {
-            "additionalProperties": false,
-            "properties": {
-              "say": {
-                "$ref": "#/$defs/SayEvent"
-              }
-            },
-            "required": [
-              "say"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "properties": {
-              "caption": {
-                "$ref": "#/$defs/CaptionEvent"
-              }
-            },
-            "required": [
-              "caption"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "properties": {
-              "sfx": {
-                "$ref": "#/$defs/SfxEvent"
-              }
-            },
-            "required": [
-              "sfx"
-            ],
-            "type": "object"
-          }
-        ]
-      },
-      "title": "Script",
-      "type": "array"
+      "title": "Script"
     },
     "setting": {
-      "$ref": "#/$defs/PartialSettingSpec",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PartialSettingSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": {
         "fit": null,
         "horizon": "mid",
@@ -1804,12 +2033,19 @@
       }
     },
     "staging": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": [],
-      "items": {
-        "$ref": "#/$defs/Relation"
-      },
-      "title": "Staging",
-      "type": "array"
+      "title": "Staging"
     }
   },
   "title": "Scenet scene",

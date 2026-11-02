@@ -12,6 +12,40 @@ below 1.0 means.
 
 ### Added
 
+- **A *Try it* link over a gallery example's try-this.** The playground puts it over the
+  `# Try this:` comment, and it uncomments the line under it, `# ` and all, as one edit Ctrl+Z
+  takes back. Deleting only the `#` by hand left a space too many, and a comic script, whose
+  try-this ends its front matter, has no comment for Ctrl+/ to toggle.
+- **The gallery shows what the checker and the compiler tell you (#240).** A new group,
+  *What Scenet tells you*, has an example for every note: `word-limit`, `panel-count`,
+  `looks-like-dialogue` and `dropped-relation` from `scenet check`, and from the compiler a
+  camera that retreats, a tail that bends around a face, a mouth a picture's fit crops away,
+  marks cut off by the frame, an inset over a face, a slant through a face, and a regular face
+  standing in for the italic and bold italic ones a document did not name (examples 53 to 62,
+  and 10). Each says what to change to make its note go away, and ends with a commented line
+  that, uncommented, is an error located on that line. The manifest declares the notes each
+  example gives under `notes:`, and the tests hold every example to exactly those: eight older
+  examples gave `camera-retreated` without anybody checking, and now say so.
+- **Every compile note has a name.** `CompileResult.compile_notes` gives each note with what
+  kind it is — `camera-retreated`, `curved-tail`, `cropped-mouth`, `cropped-marks`,
+  `inset-covers-face`, `slant-cuts-face`, `italic-stand-in` or `bold-italic-stand-in` — as a
+  `CompileNote`, exported beside `CompileResult`. `notes` still gives the sentences, word for
+  word: match on the name, which stays when a sentence is reworded.
+- **The playground lists what `scenet check` notes**, each under its rule and a click away
+  from its line, as an error is, then what the compiler noted, under its name. A check's note
+  was a squiggle in the editor and nothing more.
+- **The gallery writes every construct of the language, and a test reads it against the
+  schemas (#239).** Eleven examples, 42 to 52: a font of your own (Comic Neue, in
+  `examples/gallery/fonts/` with its licence), a sound pulled toward a zone from its source,
+  the five zones between the corners, a description, staging spelled out as subject, predicate
+  and object, a mass in front of the cast, a document of two pages with an inset read after its
+  panel, leaving somebody out with `null`, a look at a voice from off panel, puppets that become
+  a picture's figures, and a JPEG. `scripts/make_gallery_photo.py` paints the JPEG and encodes it
+  itself. The coverage test now walks each document beside the published panel and scene
+  schemas, so a word in a comment no longer passes it: every property, enum value, form and
+  signed number they offer must be written, as must the removals the docs teach, every pose and
+  expression of every puppet, a second page, and both picture formats.
+
 - **The playground's gallery is a guided tour (#237).** It opens on a new example,
   `38-tour.scene.yaml`: one page lettered over both gallery pictures in colour, with posed
   puppets, figures a picture draws, a locale caption, a thought, emanata, a sound effect and an
@@ -19,6 +53,19 @@ below 1.0 means.
   under the editor each says in a sentence what it shows, with a link to the page of the
   documentation that explains it. `#example=<file>` opens a gallery example by name, a link
   that does not go stale as a `#src=` share link does when the example changes.
+- **The playground shows every output (#238).** Depth, Mask, Pose, Boxes and Semantics tabs
+  show the exports for image models of every panel of any document, side by side under each
+  panel's name, made only while one of them is open. A **Screen reader** tab lists what a
+  screen reader is given: every image and group the SVG names, nested, with its words. A
+  **Files** tab shows the files beside the document: the gallery's pictures and artwork
+  contracts, and the fonts and pictures you add. An **Output** menu letters with live text, as
+  `--live-text` does, and shows a document of several panels as its pages, a strip, or each
+  panel on its own. A document of several panels downloads its exports as one ZIP, each file
+  named as `scenet build --conditioning` names it.
+- **`scenet.emit.preview` draws the pose and the boxes** to be looked at: each actor's skeleton
+  in OpenPose's colours, and each box labelled with its phrase in its region's colour in the
+  mask. `scenet.emit.export.conditioning_archive` puts every panel's exports in one ZIP, the
+  same bytes on every run and every platform.
 - **The gallery manifest gains `groups:`, `start:`, and `group:`, `summary:` and `doc:` on
   every entry**, and its titles are short names. Entries are only ever appended, as its header
   now says: a playground draft remembers its example by position. The spec pack prints each
@@ -28,6 +75,32 @@ below 1.0 means.
 
 - **A note in the playground is styled as information**, neutral and marked ℹ, not as an
   orange warning: nothing is wrong when the compiler says what it decided.
+- **The gallery's CI job drops the notes the manifest declares before code scanning**
+  (`scripts/check_gallery.py`), so the examples that give a note on purpose open no alert. An
+  error, or a note nobody declared, is still uploaded and still fails the job.
+
+### Fixed
+
+- **A line indented to match no line above it is said to be** (#261). PyYAML calls it
+  "expected <block end>", which says nothing of the space too many or too few behind it;
+  the message now says how far in the line is, and how far in the line it likely goes with
+  is: deleting the `#` of a gallery example's try-this line and leaving its space, say.
+- **A syntax error in a comic script's front matter is located** (#261): rule `syntax`, on its
+  line of the file, where it was rule `invalid-field` on line 1, with line numbers counted
+  from the front matter's first line.
+- **The how-to on debugging a layout named two of the compiler's notes**; there are eight,
+  now each in a table with what to do about it.
+- **The scene schema accepts a `null` wherever `settle` applies one** (#239): `camera: null` on
+  a panel of figures over one with a camera, as the docs teach, was underlined in an editor and
+  compiled. Any key a scene reaches through mappings may now be `null`; a list entry is still
+  whole. The panel schema is unchanged.
+- **A member left out with `null` keeps the look at them while heard from off panel** (#258).
+  `cast: {carol: null}` dropped the panel's own `bob looking_at carol`, with a
+  `dropped-relation` note, even while Carol spoke `off_panel` there, and her `off_panel: true`
+  ended on the side nearer her balloon. As with a comic script's `CAROL (OP)`, Bob now turns
+  toward her side and her line ends on the side she was written to stand on; every other
+  relation that names her still goes. In a script, `@cast: {CAROL: null}` beside `CAROL (OP)`
+  is no longer refused as drawing her.
 
 **Upgrading from 0.12.0.**
 
@@ -35,8 +108,46 @@ below 1.0 means.
   and with it the bytes of its `.depth.svg`: regenerate golden depth maps of your own. Nothing
   else changes, Panel Core included.
 
+### Added
+
+- **The tinted ladder** (#244), the first step of the colour policy: the value ladder in
+  colour, each value with the OKLab lightness of the grey on its rung, so that a panel drawn in
+  it is, in monochrome, the panel drawn in greys. Each hour has a shadow hue at the foreground and
+  an atmosphere hue at the sky, and the rungs move between them. `TINTED` in
+  `scenet.solve.backdrop` is generated from those two ends by `scripts/make_palette.py`, and
+  `scripts/setting_sheet.py --palette tinted` draws every place and weather in it.
+- **`palette: mono | tinted`** (#244), what a panel is drawn in. `tinted` draws every value on the
+  ladder (the masses of a setting, the veil and the rain) in its twin colour. `mono`, the default,
+  is what every panel already was. It is written where `lettering` is: at the top of a panel, beside
+  `panels:` for every panel, on one panel for that panel alone, or in a comic script's front matter
+  or as `@palette:`. A panel may have its own, for a flashback in grey on a page in colour. Panel Core
+  keeps every grey where it was and adds `colour` beside it (`fall_colour` for rain), with `palette`
+  at the top, all left out in `mono`: no existing Core, SVG or export changes. Every decision is
+  still made on the grey, so a tinted Core with its colours taken out is the mono one. The pose,
+  boxes, depth and mask exports are the same in every palette, and the semantics names the palette
+  when it is not `mono`. `Palette` is exported, and `colour_for` gives a grey's twin.
+- **`scenet build --mono`** (#244) draws a tinted document as a black-and-white edition, without
+  editing it: every value as its grey, and every panel, page and strip byte-identical to what the
+  same document writes with `palette: mono`. `render`, `render_page`, `render_pages` and
+  `render_strip` take `mono=True`, MCP `render` takes `mono`, and `PanelCore.as_mono()` gives the
+  panel with its colours taken back out, which is the mono Core.
+- **`tone: warm`** (#244), the yellow `locale` caption that #28 left out for want of a colour policy.
+  Its value is the `day` row's atmosphere rung, `#eeeeee`, taken by index as `pale` and `ink` are,
+  and it is lettered in ink. Under `palette: tinted` its box is drawn in that grey's twin, the pale
+  yellow `#fef0a1`, which the ink reads on at 16:1. In `mono` it is the grey, which is what a
+  black-and-white reprint does to a yellow caption. Panel Core records the yellow as the caption's
+  `colour`, beside `fill`, and leaves it out in `mono`. `paper`, `pale` and `ink` stay neutral in
+  every palette.
+- **Colour in the gallery and the reference** (#244). Two gallery examples, *Every hour in colour*
+  and *A flashback in grey*, join *A yellow caption*. The language reference has a `palette`
+  section with both pages as pictures, and `warm` in the `tone` table. Panel Core's reference
+  documents the colour keys, and the design decisions record why colour is a twin of value.
+
 ### Changed
 
+- **`lightness` and `contrast_ratio` refuse a colour** (#244) with a `ValueError`, rather than
+  answer for it with a formula that is exact only for a neutral grey. Every decision the compiler
+  makes from a value is made on the grey.
 - **A ground, floor or stretch of water recedes in the depth export** (#227), instead of standing
   as one flat grey that a depth model reads as a wall. Each is a straight vertical ramp from its own
   step at the horizon to the farthest figure's step at the bottom edge, white when every figure

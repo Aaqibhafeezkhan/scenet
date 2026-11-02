@@ -52,10 +52,13 @@ from scenet.compose import (
     DIRECTION_KEY,
     NOT_A_DEFAULT,
     OVER_KEY,
+    looks_toward,
     merge,
     names,
+    on_their_side,
     own_direction,
     relation_text,
+    resolve_beneath,
     resolve_overrides,
     settle,
 )
@@ -74,7 +77,6 @@ from scenet.ir import (
     Direction,
     PageLayout,
     PanelIR,
-    Predicate,
     SfxSize,
     ShotType,
     Side,
@@ -491,19 +493,29 @@ def _split_front_matter(text: str, source: Path | None) -> tuple[dict[str, Any],
     if not match:
         return {}, text, 0
     consumed = text.count("\n", 0, match.end())
+    # Read with one empty line for each line of the file above it, so every line YAML
+    # names -- a repeated key's, a syntax error's, in its message as in its mark -- is the
+    # file's, not the block's (#261).
+    padded = "\n" * text.count("\n", 0, match.start(1)) + match.group(1)
     try:
-        loaded = load(match.group(1))
+        loaded = load(padded)
     except DuplicateKeyError as exc:
-        # The block's line, moved to the file's: the cast is what usually repeats.
-        line = text.count("\n", 0, match.start(1)) + exc.line
+        # The cast is what usually repeats.
         raise ScriptSyntaxError(
-            f"line {line}: in the front matter, {exc.summary}",
+            f"line {exc.line}: in the front matter, {exc.summary}",
             source=source,
-            line=line,
+            line=exc.line,
             rule="duplicate-key",
         ) from exc
     except yaml.YAMLError as exc:
-        raise ScriptSyntaxError(f"invalid front matter: {describe(exc)}", source=source) from exc
+        mark = getattr(exc, "problem_mark", None)
+        line = mark.line + 1 if mark is not None else None
+        raise ScriptSyntaxError(
+            f"{f'line {line}: ' if line else ''}invalid front matter: {describe(exc)}",
+            source=source,
+            line=line,
+            rule="syntax",
+        ) from exc
     if loaded is None:
         return {}, text[match.end() :], consumed
     if not isinstance(loaded, dict):
@@ -1921,7 +1933,7 @@ def _off_panel(
                 line=later,
                 rule="off-panel-speaker",
             )
-        if isinstance(own_cast, dict) and speaker in own_cast:
+        if isinstance(own_cast, dict) and own_cast.get(speaker) is not None:
             raise ScriptSyntaxError(
                 f"line {line}: {speaker} speaks from off panel, but this panel's own @cast: "
                 "draws them; leave them out of it",
@@ -1937,13 +1949,13 @@ def _off_panel(
         **document,
         "cast": {key: value for key, value in cast.items() if key not in leaving},
     }
-    document["script"] = [_on_their_side(event, cast) for event in document.get("script", [])]
+    document["script"] = [on_their_side(event, cast) for event in document.get("script", [])]
     staging = document.get("staging")
     if isinstance(staging, list):
         kept = []
         for index, relation in enumerate(staging):
             named = next((speaker for speaker in leaving if names(relation, speaker)), None)
-            if named is None or _looks_toward(relation, named, leaving):
+            if named is None or looks_toward(relation, named, leaving):
                 kept.append(relation)
                 continue
             line = draft.event_lines[speakers[named]]
@@ -1960,33 +1972,6 @@ def _off_panel(
             )
         document["staging"] = kept
     return document
-
-
-def _looks_toward(relation: object, speaker: str, leaving: Collection[str]) -> bool:
-    """Whether a relation is somebody still drawn looking at a speaker who is not."""
-    if isinstance(relation, str):
-        words = relation.split()
-        if len(words) != 3:
-            return False
-        subject, predicate, target = words
-    elif isinstance(relation, dict):
-        subject, predicate, target = (
-            relation.get(key) for key in ("subject", "predicate", "object")
-        )
-    else:
-        return False
-    return predicate == Predicate.LOOKING_AT.value and target == speaker and subject not in leaving
-
-
-def _on_their_side(event: dict[str, Any], cast: dict[str, Any]) -> dict[str, Any]:
-    """An off-panel line with no side named, given the side its speaker was written at."""
-    say = event.get("say")
-    if say is None or say.get("off_panel") is not True:
-        return event
-    member = cast.get(say["by"])
-    at = str(member.get("at", "")) if isinstance(member, dict) else ""
-    side = next((value for value in ("left", "right") if at.startswith(value)), None)
-    return event if side is None else {"say": {**say, "off_panel": side}}
 
 
 def _over_target(target: str, name: str, draft: _PanelDraft, names: Collection[str]) -> str:
@@ -2008,13 +1993,15 @@ def _over_target(target: str, name: str, draft: _PanelDraft, names: Collection[s
     return found
 
 
-def _composed(panels: dict[str, _PanelDraft], source: Path | None) -> dict[str, dict[str, Any]]:
-    """Every panel as a whole document, its `@over:` chain resolved.
+def _composed(
+    panels: dict[str, _PanelDraft], source: Path | None
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Every panel as a whole document, its `@over:` chain resolved -- and beneath it.
 
     The same merge YAML's `over:` gets (`compose.resolve_overrides`): a panel's own
     directives win, and lists are replaced, never joined. A script panel always has its
     own `script`, possibly empty, so dialogue is never inherited -- only what the panel
-    over it set up.
+    over it set up. Beneath is the same with no `null` applied (`compose.resolve_beneath`).
 
     Raises:
         ScriptSyntaxError: Rule `composition`, at the `@over:` line, for a panel that does
@@ -2026,7 +2013,7 @@ def _composed(panels: dict[str, _PanelDraft], source: Path | None) -> dict[str, 
             target = documents[name].get(OVER_KEY)
             if isinstance(target, str):
                 documents[name][OVER_KEY] = _over_target(target, name, draft, documents)
-        return resolve_overrides(documents)
+        return resolve_overrides(documents), resolve_beneath(documents)
     except CompositionError as exc:
         name = str(exc.loc[1]) if len(exc.loc) > 1 else ""
         line = panels[name].directive_lines.get((OVER_KEY,)) if name in panels else None
@@ -2049,10 +2036,12 @@ def _validate(
     `@over:` is resolved first, then the front matter merged under each panel, as a YAML
     scene's defaults are merged under each of its panels.
     """
-    composed = _composed(panels, source)
+    composed, standing = _composed(panels, source)
     result: dict[str, PanelIR] = {}
     for name, draft in panels.items():
-        settled, dropped = settle(merge(front_matter, composed[name]))
+        settled, dropped = settle(
+            merge(front_matter, composed[name]), beneath=merge(front_matter, standing[name])
+        )
         line = draft.directive_lines.get(("cast",)) or draft.directive_lines.get((OVER_KEY,))
         line = line or draft.line
         notes.extend(

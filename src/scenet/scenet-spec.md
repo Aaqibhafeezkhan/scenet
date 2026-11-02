@@ -320,8 +320,9 @@ itself: there is nothing behind it to reveal.
 
 ### `time` and `weather`
 
-`time` does not tint a daytime panel. It supplies the two ends of the value ladder — the value of
-the foreground and the value of the atmosphere — and the planes are spaced evenly between them in
+`time` sets a panel's values. In `mono` it adds no colour, and under [`palette: tinted`](#palette)
+each value takes the hour's colour without changing. It supplies the two ends of the value ladder —
+the value of the foreground and the value of the atmosphere — and the planes are spaced evenly between them in
 [OKLab](https://bottosson.github.io/posts/oklab/) lightness, which predicts perceived lightness
 well. So `night` is a darker, *narrower* ladder, which is what night does to a drawn scene, and the
 ladder stays monotonic in depth at every hour by construction rather than by tuning.
@@ -640,8 +641,11 @@ script:
 
 A panel that shares a cast, through `over:` or a scene's defaults, leaves a member out with
 `null`: `cast: {carol: null}`, and Carol is not drawn there — so she may speak from off panel in it.
-See [Leaving something out](https://creatoan.github.io/scenet/howto/compile_a_sequence.html#leaving-something-out). A comic script
-does it with `(OP)`.
+Of the relations the panel shares that name her, `bob looking_at carol` still holds while she does,
+and her `off_panel: true` ends on the side she was written to stand on, `at: left_third` being the
+left, unless her line names one; every other relation goes. See
+[Leaving something out](https://creatoan.github.io/scenet/howto/compile_a_sequence.html#leaving-something-out). A comic script does
+it with `(OP)`.
 
 ### `caption`
 
@@ -694,8 +698,9 @@ the `setting` block produces, a white box on a noon sky is 1.16:1: legible, and 
 | `paper` | `#ffffff` | the paper the panel is printed on — **the default** | ink |
 | `pale` | `#adadad` | the `day` row of the value ladder, far plane | ink |
 | `ink` | `#090909` | the `day` row of the value ladder, foreground | paper |
+| `warm` | `#eeeeee` | the `day` row of the value ladder, atmosphere — yellow under `tinted` | ink |
 
-Two of the three are rungs of the ladder in `solve/backdrop.py`, taken by index rather than restated
+Three of the four are rungs of the ladder in `solve/backdrop.py`, taken by index rather than restated
 as literals, so lettering and backdrop cannot drift apart as either is tuned. A tone is **fixed, not
 a function of the panel's `time`**: a caption's value is a property of the caption, and letting it
 follow the hour would make the table below a function of the panel.
@@ -708,15 +713,18 @@ Two floors, and only the first is a rule every tone must meet:
 
 - **Lettering, 4.5:1.** A caption's text against its own fill, WCAG AA for body text. This is the
   contrast a reader actually gets, and every tone in the palette clears it with room — 18.9:1,
-  8.4:1 and 19.9:1 respectively.
+  8.4:1, 19.9:1 and 16.3:1 respectively, and `warm` 16.4:1 on its yellow.
 - **Separation, 3:1.** The box against the plane behind it. *No tone is required to clear this on
   every rung*, and the default does not: white on a noon sky is the case that motivated the feature.
   What the palette owes you is an escape from every background the compiler can produce — at least
   one tone above 3:1 for every rung of every hour — and that is what the test suite checks.
 
-There is no free-form `fill:`, and no yellow. An open colour field would be this language's one open
-vocabulary and would let you produce an unreadable box; the classic yellow `locale` caption would be
-the first non-neutral value in the codebase, and there is no colour policy to put it under yet.
+`warm` is the classic yellow `locale` caption. Its value is a rung of the ladder like the others,
+and its lettering is chosen on that grey; under [`palette: tinted`](#palette) its box is drawn in the
+grey's twin, the pale yellow `#fef0a1`, of the same lightness. In `mono` it is the grey, which is
+what a black-and-white reprint does to a yellow caption. `paper`, `pale` and `ink` stay neutral in
+every palette. There is no free-form `fill:`: an open colour field would be this language's one open
+vocabulary and would let you produce an unreadable box.
 
 **Text is set flush left.** This is a *convention*, not a rule the way reading order is: the
 lettering references describe left alignment as the norm while calling it a house preference. It is
@@ -989,6 +997,71 @@ What follows it, in a panel:
 And on a [page](#page-and-pages): each tier's panels from the right, the pages of a document side
 by side from the right, and a strip from the right — each still written in reading order, the
 order a screen reader follows.
+
+## `palette`
+
+What a panel is drawn in: the value ladder in grey, as every panel has always been, or in colour.
+
+```yaml
+palette: tinted
+setting: {place: docks, time: dusk}
+```
+
+| Key | Means | Default |
+|---|---|---|
+| `palette` | `mono` or `tinted` | `mono` |
+
+![The docks at dawn in fog, rose; at noon, blue under a pale sky; at dusk, orange behind deep violet; at midnight in rain, blue all the way back](https://creatoan.github.io/scenet/images/palette/hours.svg)
+
+**Colour is a twin of value, never a replacement.** Under `tinted`, every value on the
+[ladder](#time-and-weather) is drawn in a colour with the same OKLab lightness, on the same rung, at
+the same hour. In monochrome a tinted panel is the mono one, value for value: the ladder stays
+monotonic in depth, and every contrast floor still holds — checked on the colours themselves, which
+weigh a little less than their greys in WCAG's luminance.
+
+Each hour has two hues: the shadow's, at the foreground, and the atmosphere's, at the sky. The
+planes between move from one to the other, the hue the short way round the circle and the chroma in
+a straight line, so with distance colour drifts toward the colour of the air. It is aerial
+perspective in colour as well as in value, and the painters' warm light and cool shadow:
+
+| `time` | Shadow | Atmosphere |
+|---|---|---|
+| `dawn` | blue violet | rose gold |
+| `day` | blue grey | sky blue |
+| `dusk` | violet | orange |
+| `night` | blue | blue |
+
+Chroma is capped at what a screen can show at each lightness, and that cap, not a tuning, is what
+drains the colour out of the dark end of night and out of a noon sky.
+
+**What it tints:** the masses of a setting, the veil of fog or cloud, falling rain, and the box of a
+[`warm` caption](#caption). **What it never tints:** snow, which is white by convention, the paper, the
+puppets, a supplied picture, and all lettering — balloons, the words in captions, and sound effects.
+Lettering stays on the black plate a printer wants it on.
+
+**Every decision is made on the grey.** Which rung a mass takes, whether rain is inked or papered,
+where a balloon goes and what a caption is lettered in are all settled before the palette is
+consulted, so a palette moves nothing. [Panel Core](https://creatoan.github.io/scenet/reference/panel_core.html) keeps each grey where it always
+was and adds the colour beside it. `scenet build --mono` draws the greys and ignores the colours: a
+black-and-white edition of a book in colour, byte for byte what `palette: mono` writes, made without
+editing a document. The [exports for image models](https://creatoan.github.io/scenet/howto/export_for_image_models.html) are the same
+in every palette, except that the semantics names one that is not `mono`.
+
+It is written where [`lettering`](#lettering) is: at the top of a panel, beside `panels:` in a
+scene, where every panel inherits it, or in a comic script's front matter. Unlike
+[`direction`](#direction), **a panel may have its own**, in a scene or as a script's `@palette:`.
+A page read two ways has no order a reader could follow, but a page in two palettes is a
+convention: the flashback in grey.
+
+![A page in colour, the street at dusk with a yellow caption; its middle panel, ten years earlier, in grey](https://creatoan.github.io/scenet/images/palette/flashback.svg)
+
+A palette with nothing to tint — no `setting`, or a supplied picture under a clear sky — is not a
+mistake and is not reported: it is a choice for the whole document, and changing it never makes a
+document invalid.
+
+**`mono` is the default**, so no panel written before palettes existed draws any differently.
+**There is no free-form colour.** `palette` is a closed set of names for the same reason `tone` is:
+an open colour would be the language's one open vocabulary, and would let a value break the ladder.
 
 ## `page` and `pages`
 
@@ -1567,7 +1640,8 @@ A panel whose own `@cast:` draws her, or in which she speaks both on and off pan
 panel's own lines.
 
 To leave somebody out of a panel who says nothing in it, write `@cast: {BOB: null}` there. As in
-YAML, the relations that name him go with him, each with a `dropped-relation` note.
+YAML, the relations that name him go with him, each with a `dropped-relation` note. Written for
+somebody who then speaks `(OP)`, it says the same as the cue alone.
 
 ## One panel over another
 
@@ -1782,7 +1856,7 @@ A setting says what is behind the cast twice. A place *is* a mass list -- the pr
 
 ### `scenet/dropped-relation`
 
-A shared staging relation does not apply in a panel its actor is left out of. A comic script's `ALICE (OP)` leaves Alice out of that panel: she is in the scene, not in the frame. `cast: {alice: null}` leaves her out of a panel that would otherwise inherit her, in YAML or in a script's `@cast:`. A relation stated for every panel -- `ALICE left_of BOB`, `ALICE looking_at BOB` -- cannot hold where she is not drawn, so it is left out of that panel. A note, since that changes what the panel stages: Bob is placed, and looks, without her.
+A shared staging relation does not apply in a panel its actor is left out of. A comic script's `ALICE (OP)` leaves Alice out of that panel: she is in the scene, not in the frame. `cast: {alice: null}` leaves her out of a panel that would otherwise inherit her, in YAML or in a script's `@cast:`. A relation stated for every panel -- `ALICE left_of BOB`, `ALICE looking_at BOB` -- cannot hold where she is not drawn, so it is left out of that panel. A note, since that changes what the panel stages: Bob is placed, and looks, without her. All but `BOB looking_at ALICE` while she speaks from off panel there: Bob turns toward her side of the frame, and nothing is noted.
 
 **Fix:** Nothing to do if that is what the panel means; otherwise draw her in it.
 
@@ -1902,7 +1976,7 @@ A sound effect has no legal position. A sound effect may cover a figure, and bal
 
 ### `scenet/syntax`
 
-The document is not valid YAML. The file could not be parsed at all, so nothing further could be checked. Usually an unclosed bracket or quote, or a line indented inconsistently with the ones around it.
+The document is not valid YAML. The file could not be parsed at all, so nothing further could be checked. Usually an unclosed bracket or quote, or a line indented inconsistently with the ones around it -- and a line that lines up with no line above it is said to be, with how far in the line it likely goes with is. A comic script's front matter is YAML too, and is read the same way.
 
 **Fix:** Fix the reported position; YAML errors cascade, so re-check after each fix.
 
@@ -2078,11 +2152,12 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
       "type": "string"
     },
     "CaptionTone": {
-      "description": "The value a caption box is filled with.\n\nA caption box is opaque, so its lettering is never at risk: the text sits on the\nfill whatever is behind it. What a tone changes is whether the *box* reads. On a\nclear day the atmosphere is `#eeeeee` and a white box on it is 1.16:1 -- legible,\nand invisible. The failing case is the pale end, not the dark one.\n\n| Tone | Fill | Where it comes from | Lettered in |\n|---|---|---|---|\n| `paper` | `#ffffff` | the paper the panel is printed on | ink |\n| `pale` | `#adadad` | the `day` row of the value ladder, far plane | ink |\n| `ink` | `#090909` | the `day` row of the value ladder, foreground | paper |\n\n**Drawn from the ladder in `solve/backdrop.py`, not from a second palette.** Two of\nthe three are rungs of it, taken by index rather than restated, which is what keeps\nlettering and backdrop from drifting apart as either is tuned. The `day` row is the\nladder at its widest, so tones taken from it span the most ground.\n\n**A tone is fixed, not a function of the panel's hour.** A caption's value is a\nproperty of the caption; letting it drift with `time` would make the contrast table\na function of the panel and the legibility floor unenforceable.\n\n`ink` produces what letterers call reversed type: the lettering inverts to paper,\nbecause black type on a near-black box is not lettering, it is a filled rectangle.\nWhich mark reads is resolved by the solver -- see\n:attr:`CoreCaption.ink <scenet.core.CoreCaption>` -- exactly as falling rain's is.\n\nThere is no free-form colour here, and no yellow. A `fill:` taking any string would\nbe the language's one open vocabulary and would let an author produce an unreadable\nbox; the classic yellow `locale` caption would be the first non-neutral value in the\ncodebase, and the language has no colour policy yet to put it under.",
+      "description": "The value a caption box is filled with.\n\nA caption box is opaque, so its lettering is never at risk: the text sits on the\nfill whatever is behind it. What a tone changes is whether the *box* reads. On a\nclear day the atmosphere is `#eeeeee` and a white box on it is 1.16:1 -- legible,\nand invisible. The failing case is the pale end, not the dark one.\n\n| Tone | Fill | Where it comes from | Lettered in |\n|---|---|---|---|\n| `paper` | `#ffffff` | the paper the panel is printed on | ink |\n| `pale` | `#adadad` | the `day` row of the value ladder, far plane | ink |\n| `ink` | `#090909` | the `day` row of the value ladder, foreground | paper |\n| `warm` | `#eeeeee` | the `day` row of the value ladder, atmosphere | ink |\n\n**Drawn from the ladder in `solve/backdrop.py`, not from a second palette.** Three of\nthe four are rungs of it, taken by index rather than restated, which is what keeps\nlettering and backdrop from drifting apart as either is tuned. The `day` row is the\nladder at its widest, so tones taken from it span the most ground.\n\n**A tone is fixed, not a function of the panel's hour.** A caption's value is a\nproperty of the caption; letting it drift with `time` would make the contrast table\na function of the panel and the legibility floor unenforceable.\n\n`ink` produces what letterers call reversed type: the lettering inverts to paper,\nbecause black type on a near-black box is not lettering, it is a filled rectangle.\nWhich mark reads is resolved by the solver -- see\n:attr:`CoreCaption.ink <scenet.core.CoreCaption>` -- exactly as falling rain's is.\n\n`warm` is the classic yellow `locale` caption (#244), under the colour policy: its\nvalue is the grey above, and in a palette with colour it is drawn in that grey's twin,\na pale yellow of the same lightness. In `mono` it is the grey, which is what a\nblack-and-white reprint does to a yellow caption. The other three are neutral in every\npalette.\n\nThere is no free-form colour here. A `fill:` taking any string would be the language's\none open vocabulary, and would let an author produce an unreadable box.",
       "enum": [
         "paper",
         "pale",
-        "ink"
+        "ink",
+        "warm"
       ],
       "title": "CaptionTone",
       "type": "string"
@@ -2413,6 +2488,15 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
         "window"
       ],
       "title": "MassKind",
+      "type": "string"
+    },
+    "Palette": {
+      "description": "What a panel is drawn in: the value ladder in grey, or its twin in colour (#244).\n\n| Palette | What it draws |\n|---|---|\n| `mono` | Every value as the grey it is -- **the default**, and what every panel was |\n| `tinted` | Every value on the ladder in its twin colour: same rung, same hour |\n\n**Colour is a twin of value, never a replacement.** A tinted colour has the OKLab\nlightness of the grey it stands for, so in monochrome a tinted panel is the mono one,\nand every decision the compiler makes from a value -- which rung a mass takes, whether\nrain is inked or papered, how a caption is lettered -- is made on the grey. Panel Core\nkeeps the grey where it always did and adds the colour beside it.\n\nOnly the ladder is tinted: the masses of a setting, the veil and the falling rain.\nSnow, the paper, the figures and all lettering stay as they are in every palette.\n\nA closed set of names, not a colour field, for the reason `CaptionTone` is one: an\nopen colour would be the language's one open vocabulary, and would let a value break\nthe ladder. See :func:`colour_for <scenet.solve.backdrop.colour_for>`.",
+      "enum": [
+        "mono",
+        "tinted"
+      ],
+      "title": "Palette",
       "type": "string"
     },
     "PanelSpec": {
@@ -2892,7 +2976,7 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
+  "description": "A complete, validated panel: the language's real definition.\n\nEvery frontend produces one of these and nothing else, which is what lets the YAML\nsyntax and the comic-script syntax coexist without the solver knowing either exists.\n**Nothing here carries a coordinate** -- computing those is the solver's job, and\nkeeping them out is what makes a panel reusable at any size.\n\nAttributes:\n    panel: Dimensions and margin.\n    camera: Framing and angle.\n    cast: Actor id to character. Declaration order is not significant; `staging`\n        decides left-to-right order.\n    staging: Spatial and attentional relations between actors.\n    script: Dialogue and captions, in reading order.\n    lettering: How the lettering is set: its type size, when the author chooses one.\n    description: What the panel shows, in words, for a reader who cannot see it: the\n        author's, or a comic script's prose. Carried and never interpreted -- nothing\n        is drawn from it. Without one, accessible output says what the panel holds.\n    direction: Which way the comic is read. The whole document's: a scene's panels and\n        a comic script's take it from the document, and none may write its own.\n    palette: What the panel is drawn in. A scene's panels inherit it like any default,\n        and unlike `direction` a panel may write its own.\n\nValidation is strict and total: unknown keys are rejected, every actor id mentioned\nin `staging` or `script` must exist in `cast`, and the ordering relations must not\ncontain a cycle. A misspelled key that was silently ignored would produce a panel\nthat is subtly wrong with no indication of why, which for a language meant to be\nprecise is the worst possible failure.\n\nExample:\n    >>> from scenet import parse_panel\n    >>> panel = parse_panel(\"panel: {size: [800.0, 600.0]}\")\n    >>> panel.panel.width, panel.camera.shot.value\n    (800.0, 'medium_shot')\n\nSee Also:\n    :func:`compile_ir <scenet.pipeline.compile_ir>`, to turn one of these into geometry.",
   "properties": {
     "camera": {
       "$ref": "#/$defs/CameraSpec",
@@ -2940,6 +3024,11 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
         "font": null,
         "size": null
       }
+    },
+    "palette": {
+      "$ref": "#/$defs/Palette",
+      "default": "mono",
+      "description": "What the panel is drawn in: `mono`, the value ladder in grey, or `tinted`, each value in a colour with the same lightness. Colour never changes a value, so a tinted panel is, in monochrome, the mono one. Inherited like any default; a panel may have its own."
     },
     "panel": {
       "$ref": "#/$defs/PanelSpec",
@@ -3024,11 +3113,13 @@ Conforming to it is necessary, not sufficient: see the note on schema validity i
 <!-- scenet-spec:part=gallery -->
 # Gallery
 
-Every example the playground offers, in the order the gallery's manifest lists them. The test suite compiles each one, so all of them are known to work.
+Every example the playground offers, in the order the gallery's manifest lists them. The test suite compiles each one, so all of them are known to work. The examples grouped under "What Scenet tells you" give a note on purpose -- a house limit run past, or something the compiler decided -- and each ends with a commented line that, uncommented, makes it an error.
 
 ## Two characters
 
 The panel from the README: two actors, who stands where, who looks at whom, and two lines of dialogue.
+
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
 
 `01-two-characters.panel.yaml`
 
@@ -3301,6 +3392,8 @@ script:
 
 One character drawn in front of another, the depth that lets two figures share space on purpose.
 
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
+
 `09-depth.panel.yaml`
 
 ```yaml
@@ -3340,6 +3433,8 @@ script:
 
 Four characters too wide for a close-up make the camera step back, and a note says by how much.
 
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
+
 `10-crowd-pullback.panel.yaml`
 
 ```yaml
@@ -3349,7 +3444,11 @@ Four characters too wide for a close-up make the camera step back, and a note sa
 #
 # The requested shot is an UPPER BOUND ON TIGHTNESS, not a promise -- and the retreat
 # is reported rather than done silently, because a panel that is quietly not the shot
-# you asked for is a panel you cannot debug. Look at the note under the picture.
+# you asked for is a panel you cannot debug. Look at the note under the picture:
+# `camera-retreated`. To make it go away, widen the panel or ask for a looser shot.
+#
+# A retreat is a compromise the compiler can make. Constraints that cannot all hold are
+# not: the last line shows one.
 
 panel:
   size: [1400, 700]
@@ -3363,6 +3462,10 @@ cast:
   carol: {reference: alice, pose: hands_on_hips}
   dave:  {reference: bob,   pose: pointing}
 
+script:
+  - say: {by: alice, text: "Is everyone here?"}
+  - say: {by: dave,  text: "Looks like it."}
+
 staging:
   - alice left_of bob
   - bob left_of carol
@@ -3371,9 +3474,9 @@ staging:
   - bob ground_shared_with carol
   - carol ground_shared_with dave
 
-script:
-  - say: {by: alice, text: "Is everyone here?"}
-  - say: {by: dave,  text: "Looks like it."}
+# Try this: delete the "# " that starts the last line. Dave left of Alice closes a loop
+# that no order can satisfy: the error `ordering-cycle`, on that line.
+#   - dave left_of alice
 ```
 
 ## Poses and facing
@@ -3414,6 +3517,8 @@ staging:
 ## A sequence
 
 Panels that follow one another, each written as what changes from the panel before.
+
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
 
 `12-sequence.scene.yaml`
 
@@ -3459,6 +3564,8 @@ panels:
 ## A comic script
 
 The same kind of panel written as a comic script, in the plain-text form writers already use.
+
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
 
 `13-comic-script.script`
 
@@ -3610,6 +3717,8 @@ script:
 ## Ten expressions
 
 Every expression the shipped puppets have, one panel each.
+
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
 
 `17-expressions.scene.yaml`
 
@@ -3926,7 +4035,8 @@ Sweat, dizziness, oaths and dust drawn round a character, and the balloons that 
 #
 # That cuts both ways. The camera frames by the body and makes no room for marks, so
 # over the taller character's head, at this framing, they would run off the top of the
-# panel -- which is why they are on Alice. Try them on Bob: `scenet build` says so.
+# panel -- which is why they are on Alice. Try them on Bob: `scenet build` says so, as
+# the example "Marks cut off" shows.
 
 panel:
   size: [1000, 700]
@@ -4129,6 +4239,8 @@ panels:
 ## Insets
 
 A small panel set into the corner of another, read before it or after it as it says.
+
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
 
 `26-insets.scene.yaml`
 
@@ -4402,6 +4514,8 @@ script:
 
 A script in the format Dark Horse asks for: a title page, counts, and captions written CAP and CAP/NAME.
 
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
+
 `31-dark-horse.script`
 
 ```text
@@ -4499,6 +4613,8 @@ panels:
 
 A script written in French: planche, cases, récitatif, pensée, hors champ and the échelle des plans.
 
+It gives the note `camera-retreated`: no fault, since a note never stops a document.
+
 `33-planche.script`
 
 ```text
@@ -4553,7 +4669,7 @@ A picture painted elsewhere behind the puppets, fitted to cover the panel or con
 
 `34-supplied-art.scene.yaml`
 
-It names `art/street.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+It names `art/street.png`, which is beside it in the gallery: a picture, not printed here.
 
 ```yaml
 # A picture drawn elsewhere, behind the cast.
@@ -4608,7 +4724,7 @@ People the picture draws, lettered from its artwork contract: balloons keep off 
 
 `35-figures.scene.yaml`
 
-It names `art/figures.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+It names `art/figures.png`, which is beside it in the gallery: a picture, not printed here.
 
 ```yaml
 # Figures a picture draws, lettered over (#71).
@@ -4877,9 +4993,9 @@ One page lettered over pictures in colour: posed puppets, figures a picture draw
 
 `38-tour.scene.yaml`
 
-It names `art/street.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+It names `art/street.png`, which is beside it in the gallery: a picture, not printed here.
 
-It names `art/figures.png`, which is beside it in the gallery: a picture, not text, so not printed here.
+It names `art/figures.png`, which is beside it in the gallery: a picture, not printed here.
 
 ```yaml
 # A tour of Scenet: one page, lettered over pictures in colour.
@@ -4970,4 +5086,1168 @@ figures:
 keep_out:
   # The timetable board.
   - [[560, 60], [860, 60], [860, 200], [560, 200]]
+```
+
+## A yellow caption
+
+The yellow locale caption in a tinted panel: a pale yellow with the value of a grey, which is what it becomes in monochrome.
+
+`39-warm-caption.panel.yaml`
+
+```yaml
+# The yellow locale caption, under the colour policy.
+#
+# `tone: warm` is the classic yellow caption that says where and when. Its value is a rung
+# of the value ladder -- the `day` row's atmosphere, `#eeeeee` -- and its lettering is
+# chosen on that grey, so it is set in ink. Under `palette: tinted` the box is drawn in the
+# grey's twin, a pale yellow of the same lightness, and the docks at night take the blues
+# of their hour.
+#
+# Delete the `palette:` line, or build with `--mono`, and the box is the grey: what a
+# black-and-white reprint does to a yellow caption. Nothing else moves, because every
+# decision was made on the grey.
+
+palette: tinted
+
+panel:
+  size: [1400, 900]
+
+camera:
+  shot: long_shot
+
+setting:
+  place: docks
+  horizon: low
+  time: night
+
+cast:
+  alice: {reference: alice, pose: pointing, at: left_third, facing: right}
+  bob: {reference: bob, pose: arms_crossed, at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+  - bob looking_at alice
+
+script:
+  - caption: {text: "Midnight. The docks.", kind: locale, tone: warm}
+  - say: {by: alice, text: "You came."}
+  - say: {by: bob, text: "You called."}
+```
+
+## Every hour in colour
+
+palette: tinted draws each value of the ladder in a colour with the same lightness: rose at dawn, blue at noon, orange at dusk, blue at night.
+
+`40-tinted-hours.scene.yaml`
+
+```yaml
+# The tinted palette: the value ladder in colour, at every hour.
+#
+# `palette: tinted`, written beside `panels:`, is a default every panel inherits. Each value
+# on the ladder is drawn in its twin: a colour with the same lightness, on the same rung,
+# at the same hour. Each hour has a shadow hue at the front and an atmosphere hue at the
+# sky -- warm light and cool shadow, as painters put it -- and the planes between move from
+# one to the other, so with distance colour drifts toward the colour of the air. Night is
+# blue all the way back, and the dark end of the ladder holds almost no colour at all.
+#
+# Build it with `--mono`, or write `palette: mono`, and every panel is the grey one, value
+# for value: colour never changes a value, so nothing moves.
+
+palette: tinted
+
+panel:
+  size: [1100, 620]
+
+camera:
+  shot: long_shot
+
+cast:
+  alice: {reference: alice, at: left_third, pose: arms_crossed}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+  - alice ground_shared_with bob
+
+pages:
+  - tiers:
+      - panels: [dawn, noon]
+      - panels: [dusk, midnight]
+
+panels:
+  dawn:
+    setting: {place: docks, time: dawn, weather: fog}
+    script:
+      - caption: {text: "Dawn.", kind: locale, prefer: top_left}
+
+  noon:
+    setting: {place: docks, time: day}
+    script:
+      - caption: {text: "Noon.", kind: locale, prefer: top_left}
+
+  dusk:
+    setting: {place: docks, time: dusk}
+    script:
+      - caption: {text: "Dusk.", kind: locale, prefer: top_left}
+
+  midnight:
+    setting: {place: docks, time: night, weather: rain}
+    script:
+      - caption: {text: "Midnight.", kind: locale, prefer: top_left}
+```
+
+## A flashback in grey
+
+A page in colour whose middle panel writes palette: mono for itself, the way a comic drops into grey for a memory.
+
+`41-flashback.scene.yaml`
+
+```yaml
+# A flashback in grey, on a page in colour.
+#
+# `palette: tinted` beside `panels:` colours every panel, and the middle one writes
+# `palette: mono` for itself: the way a comic drops into grey for a memory. Unlike
+# `direction`, which is the whole document's, a palette may be a panel's own. A page read
+# two ways has no order a reader could follow; a page in two palettes is a convention.
+#
+# The yellow `warm` caption says where the story is now. In the grey panel the caption is
+# `paper`, because a memory has no hour of its own to name.
+
+palette: tinted
+
+panel:
+  size: [1100, 620]
+
+camera:
+  shot: medium_shot
+
+setting: {place: street, time: dusk}
+
+cast:
+  alice: {reference: alice, at: left_third, facing: right}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+  - bob looking_at alice
+
+pages:
+  - tiers:
+      - panels: [now]
+      - panels: [then]
+      - panels: [again]
+
+panels:
+  now:
+    script:
+      - caption: {text: "The same street, years on.", kind: locale, tone: warm, prefer: top_left}
+      - say: {by: alice, text: "You haven't changed."}
+
+  then:
+    palette: mono
+    setting: {time: day}
+    script:
+      - caption: {text: "Ten years earlier.", kind: locale, prefer: top_left}
+      - say: {by: bob, text: "Promise you'll come back."}
+
+  again:
+    script:
+      - say: {by: bob, text: "Neither have you."}
+```
+
+## Your own font
+
+Lettering in a font you supply, Comic Neue: one file for every face, then a file each for dialogue, captions, a stressed word and a sound.
+
+`42-your-own-font.scene.yaml`
+
+It names `fonts/ComicNeue-Regular.ttf`, which is beside it in the gallery: a font, not printed here.
+
+It names `fonts/ComicNeue-Italic.ttf`, which is beside it in the gallery: a font, not printed here.
+
+It names `fonts/ComicNeue-BoldItalic.ttf`, which is beside it in the gallery: a font, not printed here.
+
+It names `fonts/ComicNeue-Bold.ttf`, which is beside it in the gallery: a font, not printed here.
+
+It names `fonts/OFL.txt`, which is beside it in the gallery: a licence, not printed here.
+
+```yaml
+# Your own font: lettering in a face you supply, instead of the one Scenet ships.
+#
+# A font is always a file you name, never one installed on the machine: what the compiler
+# measures has to be the same everywhere. Paths are relative to this document -- these are
+# in fonts/, beside it, and the playground writes them there for you.
+#
+# `font:` may name one file, which then letters every face, as in the first panel. Or it
+# names a file for each face, as in the second: `regular` for dialogue, `italic` for
+# captions, `bold_italic` for a stressed word, `display` for sound effects. The face is
+# Comic Neue, under the SIL Open Font License, which is in fonts/OFL.txt.
+#
+# The second panel also sets its own type size. Written there, `size` letters that panel
+# alone; written beside `panels:`, it would letter every panel.
+
+panel: {size: [1000, 650]}
+camera: {shot: full_shot}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+
+panels:
+  one-file:
+    lettering: {font: fonts/ComicNeue-Regular.ttf}
+    script:
+      - say: {by: alice, text: "Is that a new font?"}
+      - say: {by: bob, text: "One file, for everything I say."}
+
+  four-faces:
+    lettering:
+      size: 30
+      font:
+        regular: fonts/ComicNeue-Regular.ttf
+        italic: fonts/ComicNeue-Italic.ttf
+        bold_italic: fonts/ComicNeue-BoldItalic.ttf
+        display: fonts/ComicNeue-Bold.ttf
+    script:
+      - caption: {text: "Later, at the type foundry.", kind: locale}
+      - say: {by: alice, text: "Now every face is _yours_."}
+      - sfx: {text: CLUNK, from: bob, size: medium}
+```
+
+## A sound pulled to a zone
+
+A sound placed by who makes it but pulled toward the zone it prefers, turned clockwise or the other way.
+
+`43-sound-pulled-to-a-zone.panel.yaml`
+
+```yaml
+# A sound pulled toward a zone.
+#
+# A sound effect `from:` somebody is placed near them. Give it a `prefer:` too and the zone
+# pulls it: still by its source, but on the side you asked for. With no source at all,
+# `prefer:` alone says where it would like to sit.
+#
+# `rotate` turns it clockwise, in degrees from -45 to 45: positive leans its top to the
+# right, negative to the left. Like everything about a sound, it is applied to the letters'
+# outlines, so it comes out the same in every viewer.
+
+panel: {size: [1200, 800]}
+camera: {shot: full_shot}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left, pose: arms_crossed}
+
+staging:
+  - alice left_of bob
+
+script:
+  - sfx: {text: RING RING, from: bob, prefer: top_right, rotate: 12, size: large}
+  - say: {by: alice, text: "Your phone."}
+  - sfx: {text: tap tap, from: alice, prefer: bottom_left, rotate: -10, size: small}
+  - say: {by: bob, text: "Let it ring."}
+```
+
+## The other five zones
+
+The five zones between the corners, from the top center to the bottom center, each still only a wish.
+
+`44-the-other-zones.panel.yaml`
+
+```yaml
+# The other five zones.
+#
+# `prefer:` names one of nine zones, top, middle or bottom crossed with left, center or
+# right. The four corners have an example of their own; these are the five between them.
+#
+# A zone is still the weakest wish in the language. A balloon never covers a face, never
+# overlaps another balloon and never breaks reading order, and only then does it get as
+# close to its zone as it can.
+
+panel:
+  size: [1200, 900]
+
+camera:
+  shot: full_shot
+
+cast:
+  alice: {reference: alice, at: center}
+
+script:
+  - say: {by: alice, text: "Top center.",    prefer: top_center}
+  - say: {by: alice, text: "Middle left.",   prefer: middle_left}
+  - say: {by: alice, text: "Middle center.", prefer: middle_center}
+  - say: {by: alice, text: "Middle right.",  prefer: middle_right}
+  - say: {by: alice, text: "Bottom center.", prefer: bottom_center}
+```
+
+## A description
+
+What the panel shows, in words, for a reader who cannot see it: read first, and never drawn from.
+
+`45-a-description.panel.yaml`
+
+```yaml
+# A description: what the panel shows, in words, for a reader who cannot see it.
+#
+# A screen reader says it first, before what is said in the panel. Nothing is drawn from it:
+# Alice looks bored because of `expression: bored`, not because the description says so.
+# Leave it out and Scenet describes the panel itself -- the shot, the setting, and who is
+# where.
+#
+# Bob's line is lettered at `size: normal`, the default, written out here beside Alice's
+# `size: small` to compare the two.
+
+description: >-
+  Late at night in a living room, Bob points at something off to the side, beaming. Alice
+  watches him, bored stiff.
+
+panel:
+  size: [1000, 650]
+
+camera:
+  shot: full_shot
+
+setting:
+  place: room
+  time: night
+
+cast:
+  alice: {reference: alice, at: left_third, expression: bored}
+  bob:   {reference: bob,   at: right_third, facing: left, pose: pointing, expression: happy}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+
+script:
+  - say: {by: bob, text: "And that is the branch line to the harbour.", size: normal}
+  - say: {by: alice, text: "Fascinating.", size: small}
+```
+
+## Staging, spelled out
+
+Staging written as subject, predicate and object, the form a program writes, mixed with the sentence form it stands for.
+
+`46-staging-spelled-out.panel.yaml`
+
+```yaml
+# Staging, spelled out.
+#
+# `alice left_of bob` is a convenience. Underneath, every relation is a subject, a
+# predicate and an object, and it may be written that way: the form a program that writes
+# Scenet finds easiest to produce. The two forms mix freely, and mean the same.
+
+panel:
+  size: [1100, 700]
+
+camera:
+  shot: full_shot
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - {subject: alice, predicate: left_of, object: bob}
+  - {subject: bob, predicate: looking_at, object: alice}
+  - alice ground_shared_with bob
+
+script:
+  - say: {by: bob, text: "Subject, predicate, object."}
+  - say: {by: alice, text: "Like a scene graph."}
+```
+
+## In front of the cast
+
+A mass on the foreground plane, drawn over the cast like a doorway in silhouette, beside masses spanning the center and the full width.
+
+`47-in-front-of-the-cast.panel.yaml`
+
+```yaml
+# In front of the cast: a mass on the `foreground` plane.
+#
+# Masses on the `near`, `mid` and `far` planes stand behind everybody. One on `foreground`
+# is drawn over the cast, the way a doorway in silhouette is, and darkest of all: reading
+# front to back, a mass never gets darker. Here it is the edge of the door Alice is looking
+# out of.
+#
+# `spans` says how much of the width a mass covers: `full`, the default, written out here,
+# `left`, `right`, or `center` -- the hill in the distance.
+
+panel:
+  size: [1100, 700]
+
+camera:
+  shot: full_shot
+
+setting:
+  horizon: mid
+  time: dusk
+  masses:
+    - {kind: sky,        plane: far,        spans: full}
+    - {kind: solid,      plane: far,        spans: center}
+    - {kind: ground,     plane: near,       spans: full}
+    - {kind: structural, plane: foreground, spans: left}
+
+cast:
+  alice: {reference: alice, at: center, facing: right}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+
+script:
+  - say: {by: alice, text: "Are you coming in?"}
+  - say: {by: bob, text: "When the sun is down."}
+```
+
+## Two pages
+
+A document of two pages, laid side by side, its panels named by page and number, with an inset read after its panel.
+
+`48-two-pages.scene.yaml`
+
+```yaml
+# Two pages: a document longer than one page.
+#
+# `pages:` is a list, and each page in it is laid out on its own, in the format `page:`
+# gives them all. The playground and `scenet build` draw them side by side, in reading
+# order: from the left, or from the right in a comic read right to left.
+#
+# A panel's name is text, so it can say where the panel is: `2-1` is the first panel of
+# page two, the name a comic script gives a panel when its numbers start again on each
+# page. Quoted, since YAML would read some such names as numbers.
+#
+# On page two, an inset sits in the top right corner of its panel and says `read: after`,
+# which is the default written out: it is read after the panel it is set into.
+
+page: {size: [1500, 2250], margin: 75, gutter: 30, tier_gutter: 45}
+setting: {place: street, time: day}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+pages:
+  - tiers:
+      - panels: ['1-1', '1-2']
+      - {height: 1.3, panels: ['1-3']}
+  - tiers:
+      - height: 1.5
+        panels:
+          - use: '2-1'
+            insets: [{use: '2-2', at: top_right, size: 0.35, read: after}]
+      - panels: ['2-3']
+
+panels:
+  '1-1':
+    camera: {shot: long_shot}
+    script:
+      - caption: {text: "Page one.", kind: locale}
+      - say: {by: alice, text: "Where does this street go?"}
+  '1-2':
+    camera: {shot: medium_shot}
+    script:
+      - say: {by: bob, text: "On to the next page."}
+  '1-3':
+    camera: {shot: full_shot}
+    script:
+      - say: {by: alice, text: "Then turn it."}
+  '2-1':
+    camera: {shot: long_shot}
+    setting: {time: dusk}
+    cast:
+      alice: {at: center}
+      bob: {at: left_third, facing: right}
+    script:
+      - caption: {text: "Page two. Much later."}
+      - say: {by: bob, text: "Still walking."}
+  '2-2':
+    camera: {shot: close_up}
+    cast:
+      bob: null
+    script:
+      - say: {by: alice, text: "My feet.", kind: whisper}
+  '2-3':
+    camera: {shot: full_shot}
+    setting: {time: night}
+    script:
+      - say: {by: alice, text: "Is this the end?"}
+      - say: {by: bob, text: "Of the document, yes."}
+```
+
+## Leaving someone out
+
+A panel that takes away somebody it would inherit, with null.
+
+`49-leaving-someone-out.scene.yaml`
+
+```yaml
+# Leaving someone out of a panel that would inherit them.
+#
+# Everything beside `panels:` is a default every panel takes, and a panel `over:` another
+# takes all of it. To take something away, write it as `null`: JSON Merge Patch's rule.
+# Here Bob leaves, and `cast: {bob: null}` leaves him out of the last panel.
+#
+# A staging relation naming him would go with him, and `scenet check` would note it, as
+# the example "A relation left out" shows. This scene places its cast with `at:` alone, so
+# there is none to lose.
+
+panel: {size: [900, 600]}
+camera: {shot: medium_shot}
+setting: {place: office, time: day}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+panels:
+  meeting:
+    script:
+      - say: {by: bob, text: "I'll leave you to it."}
+      - say: {by: alice, text: "Thanks, Bob."}
+
+  alone:
+    over: meeting
+    cast:
+      bob: null
+    script:
+      - say: {by: alice, text: "Finally.", kind: whisper}
+```
+
+## Looking off panel
+
+Somebody heard from off panel can be looked at: Bob turns toward the side the voice comes from.
+
+`50-looking-off-panel.scene.yaml`
+
+```yaml
+# Looking at a voice from off panel.
+#
+# Somebody heard from off panel is nobody the panel draws, so nothing can be staged against
+# them -- except a look. `bob looking_at carol` turns Bob toward the side Carol is heard
+# from, and aims his eyes out of the frame. With `off_panel: true` and no side named, as in
+# the second panel, she is heard from the side Bob faces, so the tail and his look agree.
+#
+# The panels have a margin. It keeps the balloons in, as always; an off-panel tail reaches
+# past it to the frame itself.
+
+panel: {size: [900, 600], margin: 40}
+camera: {shot: medium_shot}
+
+cast:
+  bob: {reference: bob, at: center}
+
+staging:
+  - bob looking_at carol
+
+panels:
+  called:
+    script:
+      - say: {by: carol, text: "Over here!", off_panel: left}
+      - say: {by: bob, text: "Carol?"}
+
+  again:
+    script:
+      - say: {by: carol, text: "No, over here.", off_panel: true}
+      - say: {by: bob, text: "Make up your mind."}
+```
+
+## From puppets to figures
+
+Two puppets in a street, then the same two people drawn by a picture, the place, camera and puppets taken away with null.
+
+`51-puppets-to-figures.scene.yaml`
+
+It names `art/figures.png`, which is beside it in the gallery: a picture, not printed here.
+
+```yaml
+# From puppets to figures: the same two people, drawn first by Scenet, then by a picture.
+#
+# In the first panel Ana and Ben are puppets in a named place. The second is `over:` it, and
+# takes everything it does not take away with `null`:
+#
+# - `place: null` beside its `image`, since a picture is a backdrop of its own;
+# - `camera: null`, since the artist already framed the picture;
+# - `reference: null` beside each `figure`, and every key that posed the puppet -- `at`,
+#   `facing` -- since a member is a puppet or a figure, never both.
+#
+# The picture's artwork contract, art/figures.art.yaml, says where each face and mouth is.
+
+panels:
+  waiting:
+    panel: {size: [1200, 600]}
+    camera: {shot: full_shot}
+    setting: {place: street, time: night}
+    cast:
+      ana: {reference: alice, at: left_third}
+      ben: {reference: bob,   at: right_third, facing: left}
+    script:
+      - say: {by: ana, text: "Is it always this late?"}
+      - say: {by: ben, text: "Only when it rains somewhere else."}
+
+  platform:
+    over: waiting
+    camera: null
+    setting: {place: null, image: art/figures.png, fit: cover}
+    cast:
+      ana: {reference: null, figure: ana, at: null}
+      ben: {reference: null, figure: ben, at: null, facing: null}
+    script:
+      - say: {by: ana, text: "Is that ours?"}
+      - say: {by: ben, text: "No."}
+```
+
+Its picture's artwork contract, `art/figures.art.yaml`, beside the picture:
+
+```yaml
+# The artwork contract for figures.png, written by scripts/make_gallery_figures.py
+# from the same constants the picture is painted from. Pixels, from the top left.
+size: [900, 600]
+figures:
+  ana:
+    face: {center: [230, 250], radius: 56}
+    mouth: [230, 273]
+    body: [[168, 296], [292, 296], [316, 600], [144, 600]]
+  ben:
+    face: {center: [410, 236], radius: 60}
+    mouth: [410, 261]
+    body: [[340, 286], [480, 286], [502, 600], [318, 600]]
+  carl:
+    face: {center: [720, 300], radius: 46}
+    mouth: [720, 319]
+    body: [[668, 338], [772, 338], [786, 600], [654, 600]]
+keep_out:
+  # The timetable board.
+  - [[560, 60], [860, 60], [860, 200], [560, 200]]
+```
+
+## A JPEG behind the cast
+
+A photograph supplied as a JPEG, read as a PNG is: by its first bytes, and for its size alone.
+
+`52-a-jpeg.panel.yaml`
+
+It names `art/harbour.jpg`, which is beside it in the gallery: a picture, not printed here.
+
+```yaml
+# A JPEG behind the cast.
+#
+# A supplied picture may be a PNG or a JPEG, the two raster formats every SVG viewer must
+# draw. The compiler tells them apart by their first bytes, not by the file's name, and
+# reads nothing but the size from either. This one, art/harbour.jpg, was painted and
+# encoded by scripts/make_gallery_photo.py.
+#
+# `time: dawn` changes nothing in the picture, whose values are the artist's: over a
+# picture, the hour only tints weather, and there is none.
+
+panel:
+  size: [1200, 700]
+
+camera:
+  shot: full_shot
+
+setting:
+  image: art/harbour.jpg
+  fit: cover
+  time: dawn
+
+cast:
+  alice: {reference: alice, at: left_third, pose: pointing}
+  bob:   {reference: bob,   at: center, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+
+script:
+  - say: {by: alice, text: "The first boat leaves at six."}
+  - say: {by: bob, text: "Then we have time for coffee."}
+```
+
+## Too many words
+
+A balloon of 34 words still compiles, and the checker notes that Dark Horse asks for about 25 at most.
+
+It gives the note `word-limit`: no fault, since a note never stops a document.
+
+`53-too-many-words.panel.yaml`
+
+```yaml
+# Too many words for one balloon: a note, not an error.
+#
+# Dark Horse's script format asks for "approximately 25 words per balloon, and about 50
+# words per panel, max". Bob's answer holds 34, so `scenet check` notes it, on its line,
+# under the rule `word-limit`. It is a limit a letterer works to, not a contradiction: the
+# panel compiles all the same, and the balloon is lettered as large as it has to be.
+#
+# Words are counted as they are lettered: `--` and an ellipsis are no words, and the
+# underscores around a stressed word add none.
+#
+# To make the note go away, split the balloon in two -- a second `say:` by Bob, which is
+# what a letterer would do -- or carry the rest of the words to the next panel.
+
+panel: {size: [1000, 700]}
+camera: {shot: full_shot}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   pose: arms_crossed, at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+
+script:
+  - say: {by: alice, text: "So what happened?"}
+  - say: {by: bob, text: "Well, I got up late, missed the bus, walked all the way, lost my keys on the way, found them again, and then the door was locked anyway, so I just came back here."}
+
+# Try this: delete the "# " that starts the last line. Alice opens a stressed word with
+# an underscore and never closes it: the error `unbalanced-emphasis`, on that line.
+#   - say: {by: alice, text: "You _walked?"}
+```
+
+## A page miscounted
+
+A script whose page says three panels where two follow: it compiles, and the checker notes the count.
+
+It gives the note `panel-count`: no fault, since a note never stops a document.
+
+`54-a-page-miscounted.script`
+
+```text
+---
+# A page that says how many panels it holds, and miscounts: a note, not an error.
+#
+# Dark Horse's format labels each page with its count, as PAGE ONE (three panels) does
+# below, and Scenet holds the page to it. Only two panels follow, so `scenet check` notes
+# the PAGE line, `panel-count`: a heading may have been missed, or written so that it
+# reads as prose. The two panels compile all the same.
+#
+# A comic script has no comments of its own, so this one is in the front matter, which is
+# YAML. To make the note go away, correct the count, or write the third panel.
+panel:
+  size: [900, 640]
+staging:
+  - MAYA left_of THEO
+  - MAYA looking_at THEO
+  - MAYA ground_shared_with THEO
+cast:
+  MAYA: {reference: alice, at: left_third}
+  THEO: {reference: bob, pose: arms_crossed, at: right_third, facing: left}
+# Try this: delete the "# " that starts the next line. Scenet ships two puppets, alice and
+# bob, and no `nell`: the error `unknown-puppet`, on that line.
+#   NELL: {reference: nell, at: center}
+---
+
+PAGE ONE (three panels)
+
+PANEL 1
+@shot: full_shot
+Maya and Theo on the harbour wall, at dusk.
+
+MAYA
+Is the ferry late again?
+
+THEO
+It was never on time.
+
+PANEL 2
+@shot: medium_shot
+Theo shrugs.
+
+THEO
+We could swim.
+```
+
+## Not read as dialogue
+
+A speaker's name misspelled in a script makes the line prose, not dialogue, and the checker points at it.
+
+It gives the note `looks-like-dialogue`: no fault, since a note never stops a document.
+
+`55-not-read-as-dialogue.script`
+
+```text
+---
+# A line set like dialogue that is not read as dialogue: a note, not an error.
+#
+# THOE: in the panel below is a typo for THEO. A name in capitals with a colon looks like
+# a speaker's line, but nobody called THOE is in the cast, so the line is read as what it
+# would be otherwise: prose, which is the panel's description and is never lettered. A
+# writer's NOTE: line is read the same way, and is no mistake -- but a misspelled speaker
+# looks exactly like one, so `scenet check` points at it, `looks-like-dialogue`, and
+# leaves the call to you.
+#
+# A comic script has no comments of its own, so this one is in the front matter, which is
+# YAML. To make the note go away, spell the name as the cast does.
+panel:
+  size: [900, 640]
+staging:
+  - MAYA left_of THEO
+  - MAYA looking_at THEO
+  - MAYA ground_shared_with THEO
+cast:
+  MAYA: {reference: alice, pose: hands_on_hips, at: left_third}
+  THEO: {reference: bob, at: right_third, facing: left}
+# Try this: delete the "# " that starts the next line. The alice puppet has no `sleepy`
+# face: the error `unknown-expression`, on that line.
+#   NELL: {reference: alice, at: center, expression: sleepy}
+---
+
+PANEL 1
+@shot: full_shot
+Maya waits at the door; Theo comes down the stairs at last.
+
+MAYA: Where were you?
+
+THOE: Asleep, mostly.
+```
+
+## A relation left out
+
+A panel that leaves Bob out with null leaves out the relation naming him too, and the checker notes it.
+
+It gives the note `dropped-relation`: no fault, since a note never stops a document.
+
+`56-a-relation-left-out.scene.yaml`
+
+```yaml
+# A relation left out with the actor it names: a note, not an error.
+#
+# Everything beside `panels:` is a default every panel takes -- here Alice, Bob, and
+# `alice left_of bob`. The second panel leaves Bob out with `cast: {bob: null}`, and a
+# relation naming somebody who is not drawn cannot hold, so it goes with him. That changes
+# what the panel stages, so `scenet check` notes it where he is left out:
+# `dropped-relation`. Alice stands where her `at:` puts her, with nobody to be left of.
+#
+# A look is the one relation that stays: `alice looking_at bob` would still hold while
+# Bob is heard from off panel, since Alice can look toward his voice.
+#
+# To make the note go away, place the cast with `at:` alone, as "Leaving someone out"
+# does, or write the relation only in the panels that draw them both.
+
+panel: {size: [900, 600]}
+camera: {shot: medium_shot}
+setting: {place: office, time: day}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+
+panels:
+  meeting:
+    script:
+      - say: {by: bob, text: "Back in a minute."}
+
+  alone:
+    cast:
+      bob: null
+    script:
+      - say: {by: alice, text: "Take your time.", kind: whisper}
+
+  back:
+    script:
+      - say: {by: bob, text: "Did I miss anything?"}
+
+# Try this: delete the "# " that starts the last line. Bob is drawn in this panel, so he
+# cannot speak in it from off panel: the error `off-panel-speaker`, on that line.
+#       - say: {by: bob, text: "Only me.", off_panel: true}
+```
+
+## A tail that bends
+
+A voice from the left with its balloon on the right: the tail bends around Bob's face, and a note says so.
+
+It gives the note `curved-tail`: no fault, since a note never stops a document.
+
+`57-a-tail-that-bends.panel.yaml`
+
+```yaml
+# A tail that bends around a face: a note, not an error.
+#
+# Carol is heard from off panel, on the left, and her balloon asks for the top right. A
+# straight tail from there to the left edge of the frame would run through Bob's head, so
+# it bends around it, and the compiler says so: `curved-tail`, "balloon b0 needed a
+# curved tail to clear a face". A bent tail is a sign the panel is crowded, or a balloon
+# is far from its speaker -- worth a second look, never a reason to refuse the panel.
+#
+# To make the note go away, let the balloon sit on the side the voice comes from: drop
+# `prefer: top_right`, or have Carol heard from the right.
+
+panel: {size: [900, 600]}
+camera: {shot: medium_close_up}
+
+cast:
+  bob: {reference: bob, at: center}
+
+script:
+  - say: {by: carol, text: "Behind you!", off_panel: left, prefer: top_right}
+
+# Try this: delete the "# " that starts the last line. A balloon may prefer one of the
+# nine zones, and `top` is none of them: the error `invalid-field`, on that line.
+#   - say: {by: bob, text: "Where?", prefer: top}
+```
+
+## A mouth cropped away
+
+A picture fitted to cover a tall panel crops Ana's mouth away, so her tail stops on the frame, and a note says so.
+
+It gives the note `cropped-mouth`: no fault, since a note never stops a document.
+
+`58-a-mouth-cropped-away.panel.yaml`
+
+It names `art/figures.png`, which is beside it in the gallery: a picture, not printed here.
+
+```yaml
+# A mouth the picture's fit crops away: a note, not an error.
+#
+# The people are in the picture -- art/figures.png, with its artwork contract beside it --
+# and `fit: cover` fills this tall, narrow panel with it, so the picture overhangs on both
+# sides and is cropped there. Ana stands on the left, and her mouth is cropped away. Her
+# balloon still points at it: the tail stops on the frame, aimed where she is, and the
+# compiler says so, `cropped-mouth`.
+#
+# To make the note go away, write `fit: contain`, which shows the whole picture, or make
+# the panel wide enough to hold her.
+
+panel: {size: [400, 900]}
+setting: {image: art/figures.png, fit: cover, time: night}
+
+cast:
+  ana: {figure: ana}
+  ben: {figure: ben}
+
+script:
+  - say: {by: ana, text: "Is it always this late?"}
+  - say: {by: ben, text: "Only when it rains."}
+
+# Try this: delete the "# " that starts the last line. Carl is in the picture, but nobody
+# cast him, so nobody can speak as him: the error `unknown-actor`, on that line.
+#   - say: {by: carl, text: "Mind the gap."}
+```
+
+Its picture's artwork contract, `art/figures.art.yaml`, beside the picture:
+
+```yaml
+# The artwork contract for figures.png, written by scripts/make_gallery_figures.py
+# from the same constants the picture is painted from. Pixels, from the top left.
+size: [900, 600]
+figures:
+  ana:
+    face: {center: [230, 250], radius: 56}
+    mouth: [230, 273]
+    body: [[168, 296], [292, 296], [316, 600], [144, 600]]
+  ben:
+    face: {center: [410, 236], radius: 60}
+    mouth: [410, 261]
+    body: [[340, 286], [480, 286], [502, 600], [318, 600]]
+  carl:
+    face: {center: [720, 300], radius: 46}
+    mouth: [720, 319]
+    body: [[668, 338], [772, 338], [786, 600], [654, 600]]
+keep_out:
+  # The timetable board.
+  - [[560, 60], [860, 60], [860, 200], [560, 200]]
+```
+
+## Marks cut off
+
+Sweat drops over the taller character run off the top, since the camera makes no room for marks, and a note says so.
+
+It gives the note `cropped-marks`: no fault, since a note never stops a document.
+
+`59-marks-cut-off.panel.yaml`
+
+```yaml
+# Marks cut off by the frame: a note, not an error.
+#
+# Emanata are drawn outside the head, in the space balloons go, and they never move
+# anybody: the camera frames by the body and makes no room for them. That cuts both ways.
+# Bob is the taller of the two, and at this framing his plewds run off the top of the
+# panel, so the compiler says so -- `cropped-marks` -- rather than let them vanish without
+# a word.
+#
+# To make the note go away, ask for a looser shot, which shows them whole, or give the
+# marks to Alice, whose head is lower.
+
+panel: {size: [1000, 700]}
+camera: {shot: medium_shot}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   pose: arms_crossed, at: right_third, facing: left, marks: [plewds]}
+
+staging:
+  - alice left_of bob
+  - alice ground_shared_with bob
+  - alice looking_at bob
+
+script:
+  - say: {by: alice, text: "You look warm."}
+  - say: {by: bob, text: "It's the coat."}
+
+# Try this: delete the "# " that starts the last line. A line with nothing said is no line
+# at all: `text` is required, and leaving it out is the error `missing-field`, there.
+#   - say: {by: alice}
+```
+
+## An inset over a face
+
+An inset set into the corner where Bob's face is covers it, since the art does not move for an inset, and a note says so.
+
+It gives the note `inset-covers-face`: no fault, since a note never stops a document.
+
+`60-an-inset-over-a-face.scene.yaml`
+
+```yaml
+# An inset over a face: a note, not an error.
+#
+# An inset is drawn over its panel, and the art beneath does not move for it: the street is
+# staged and framed as if the clock were not there, and only its lettering keeps clear.
+# The clock is set into the top right corner, which is where Bob's face is, so the
+# compiler says so: `inset-covers-face`.
+#
+# To make the note go away, set the inset into another corner -- the top left is clear --
+# make it smaller, or frame the street so that nobody's face is in that corner.
+
+page: {size: [1500, 1000], margin: 75, gutter: 30, tier_gutter: 45}
+setting: {place: street, time: day}
+
+panels:
+  street:
+    camera: {shot: medium_shot}
+    cast:
+      alice: {reference: alice, at: left_third}
+      bob:   {reference: bob,   pose: arms_crossed, at: right_third, facing: left}
+    staging:
+      - alice left_of bob
+      - alice looking_at bob
+    script:
+      - say: {by: alice, text: "We'll miss the start."}
+
+  clock:
+    camera: {shot: close_up}
+    cast:
+      bob: {reference: bob, expression: bored}
+    script:
+      - caption: {text: "9:14.", kind: locale}
+
+pages:
+  - tiers:
+      - panels:
+          - use: street
+            insets:
+              - {use: clock, at: top_right, size: 0.35}
+
+# Try this: delete the "# " that starts the last line. A panel is placed on a page once,
+# and the clock already is: the error `page-layout`, on that line.
+#               - {use: clock, at: bottom_left, size: 0.25}
+```
+
+## A slant through a face
+
+A slanted gutter cuts across Bob's face in a close-up, since the camera does not know the cut is there, and a note says so.
+
+It gives the note `slant-cuts-face`: no fault, since a note never stops a document.
+
+`61-a-slant-through-a-face.scene.yaml`
+
+```yaml
+# A slant through a face: a note, not an error.
+#
+# A slanted tier leans the gutters between its panels, and each panel is staged and framed
+# in its bounding box as usual, then cut to its outline, as a margin would cut it. The
+# camera does not know the cut is there. Here the close-up of Bob is cut right across his
+# face, so the compiler says so: `slant-cuts-face`.
+#
+# To make the note go away, lean the tier less, or frame the shot so that the face is
+# clear of the cut: a looser shot, or the face further from the slanted side.
+
+page: {size: [1500, 900], margin: 75, gutter: 30, tier_gutter: 45}
+setting: {place: street, time: night}
+
+panels:
+  swing:
+    camera: {shot: full_shot}
+    cast:
+      alice: {reference: alice, pose: pointing, expression: shouting, facing: right}
+    script:
+      - say: {by: alice, text: "Take that!", kind: shout}
+
+  hit:
+    camera: {shot: close_up}
+    cast:
+      bob: {reference: bob, expression: surprise, facing: left}
+    script:
+      - say: {by: bob, text: "Oof."}
+
+pages:
+  - tiers:
+      - {slant: 20, panels: [swing, hit]}
+
+# Try this: delete the "# " that starts the last line. A slant leans the gutters between
+# panels, so a tier of one has none to lean: the error `page-layout`, on that line.
+#       - {slant: 10, panels: [swing]}
+```
+
+## A face standing in
+
+Comic Neue Regular named alone stands in for the italic and the bold italic faces, and a note says so for each.
+
+It gives the notes `italic-stand-in` and `bold-italic-stand-in`: no fault, since a note never stops a document.
+
+`62-a-face-standing-in.panel.yaml`
+
+It names `fonts/ComicNeue-Regular.ttf`, which is beside it in the gallery: a font, not printed here.
+
+It names `fonts/OFL.txt`, which is beside it in the gallery: a licence, not printed here.
+
+```yaml
+# A face standing in for one the document did not name: two notes, not errors.
+#
+# `lettering.font` names Comic Neue Regular, and no other face. Every caption but a
+# `spoken` one is set in italic, and a stressed word in bold italic -- so for those the
+# regular face stands in: the caption is set upright, and so is the stressed word. The
+# compiler says so once for each face, `italic-stand-in` and `bold-italic-stand-in`. It is
+# your face that stands in, not the shipped italic: a family mixing your face with
+# another would not be one family.
+#
+# To make the notes go away, name the two faces, which are beside the regular one in
+# fonts/: `italic: fonts/ComicNeue-Italic.ttf` and
+# `bold_italic: fonts/ComicNeue-BoldItalic.ttf`. Comic Neue is under the SIL Open Font
+# License, in fonts/OFL.txt.
+
+panel: {size: [1000, 650]}
+camera: {shot: full_shot}
+
+lettering:
+  font: {regular: fonts/ComicNeue-Regular.ttf}
+
+cast:
+  alice: {reference: alice, at: left_third}
+  bob:   {reference: bob,   at: right_third, facing: left}
+
+staging:
+  - alice left_of bob
+  - alice looking_at bob
+
+script:
+  - caption: {text: "Later, at the type foundry.", kind: locale}
+  - say: {by: alice, text: "Is this _really_ italic?"}
+
+# Try this: delete the "# " that starts the last line. Only a `spoken` caption is said by
+# somebody, so a locale caption naming Bob is the error `caption-speaker`, on that line.
+#   - caption: {text: "Meanwhile.", kind: locale, by: bob}
 ```
