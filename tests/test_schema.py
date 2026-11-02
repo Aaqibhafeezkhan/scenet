@@ -27,6 +27,7 @@ from scenet.ir import (
     Horizon,
     Mark,
     MassKind,
+    Palette,
     PanelIR,
     PlacementZone,
     Plane,
@@ -81,6 +82,7 @@ class TestPanelSchema:
             "lettering",
             "description",
             "direction",
+            "palette",
         }
 
     def test_it_is_a_valid_schema(self):
@@ -106,6 +108,7 @@ class TestPanelSchema:
             Fit,
             SfxSize,
             Direction,
+            Palette,
         ],
     )
     def test_every_enum_member_reaches_the_schema(self, enum: type[StrEnum]):
@@ -198,6 +201,32 @@ class TestTheSchemaDescribesWhatIsWritten:
     )
     def test_a_scene_panel_may_change_its_backdrop(self, source: str):
         assert problems(scene_schema(), source) == []
+
+    @pytest.mark.parametrize(
+        "removal",
+        [
+            # The docs' own: a panel of figures over one that has a camera (#239).
+            "camera: null",
+            "camera: {shot: null}",
+            "setting: {weather: null}",
+            "lettering: {font: null}",
+            "panel: {margin: null}",
+            "cast: {alice: {pose: null}}",
+        ],
+    )
+    def test_a_scene_panel_may_take_away_what_it_inherits(self, removal: str):
+        """Merge Patch, as `settle` applies it: a null in a mapping, at any depth, removes."""
+        source = (
+            "camera: {shot: full_shot}\ncast: {alice: {reference: alice}}\n"
+            f"panels:\n  one: {{}}\n  two: {{over: one, {removal}}}\n"
+        )
+        assert problems(scene_schema(), source) == []
+
+    def test_a_null_in_a_list_is_still_refused(self):
+        """`settle` leaves lists alone: a script entry or a mass is whole or wrong."""
+        assert problems(scene_schema(), "panels:\n  one: {script: [{say: null}]}\n") != []
+        source = "panels:\n  one: {setting: {masses: [{kind: sky, plane: null}]}}\n"
+        assert problems(scene_schema(), source) != []
 
     def test_a_scene_panel_still_cannot_write_two_backdrops(self):
         source = "panels:\n  one: {setting: {image: art/a.png, place: docks}}\n"

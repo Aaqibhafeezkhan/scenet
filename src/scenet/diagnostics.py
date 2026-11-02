@@ -63,6 +63,7 @@ from scenet.compose import (
     merge,
     own_direction,
     relation_text,
+    resolve_beneath,
     resolve_overrides,
     settle,
 )
@@ -168,7 +169,9 @@ RULES: dict[str, Rule] = {
         description=(
             "The file could not be parsed at all, so nothing further could be checked. "
             "Usually an unclosed bracket or quote, or a line indented inconsistently "
-            "with the ones around it."
+            "with the ones around it -- and a line that lines up with no line above it is "
+            "said to be, with how far in the line it likely goes with is. A comic script's "
+            "front matter is YAML too, and is read the same way."
         ),
         help="Fix the reported position; YAML errors cascade, so re-check after each fix.",
     ),
@@ -515,7 +518,9 @@ RULES: dict[str, Rule] = {
             "would otherwise inherit her, in YAML or in a script's `@cast:`. A relation stated "
             "for every panel -- `ALICE left_of BOB`, `ALICE looking_at BOB` -- cannot hold "
             "where she is not drawn, so it is left out of that panel. A note, since that "
-            "changes what the panel stages: Bob is placed, and looks, without her."
+            "changes what the panel stages: Bob is placed, and looks, without her. All but "
+            "`BOB looking_at ALICE` while she speaks from off panel there: Bob turns toward "
+            "her side of the frame, and nothing is noted."
         ),
         help="Nothing to do if that is what the panel means; otherwise draw her in it.",
         level="note",
@@ -1111,6 +1116,7 @@ def _diagnose_panel(
     library: PuppetLibrary | None = None,
     deep: bool = False,
     base: Folder | None = None,
+    beneath: dict[str, Any] | None = None,
 ) -> list[Diagnostic]:
     """Validate one panel mapping and report what is wrong with it.
 
@@ -1126,11 +1132,12 @@ def _diagnose_panel(
             reach `layout` and `balloon-placement` -- rules the cheap pass cannot
             produce because they only surface once the solver runs.
         base: The document's folder, which declared font files are read from.
+        beneath: The same panel with no removal written, for `settle`.
 
     Returns:
         Findings, unsorted.
     """
-    data, dropped = settle(data)
+    data, dropped = settle(data, beneath=beneath)
     notes = [
         Diagnostic(
             rule="dropped-relation",
@@ -1334,8 +1341,10 @@ def _diagnose_scene(
         for key, value in data.items()
         if key not in ("panels", DESCRIPTION_KEY) and key not in LAYOUT_KEYS
     }
+    standing = resolve_beneath(panels)
     for name, document in composed.items():
         merged = merge(defaults, document) if defaults else document
+        beneath = merge(defaults, standing[name]) if defaults else standing[name]
         prefix = ("panels", name)
         for item in _diagnose_panel(
             merged,
@@ -1345,6 +1354,7 @@ def _diagnose_scene(
             library=library,
             deep=deep and not paged,
             base=base,
+            beneath=beneath,
         ):
             # A fault in a default is inherited by every panel that does not override
             # it, so checking panel by panel finds it once per panel, located at the
