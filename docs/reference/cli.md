@@ -88,6 +88,14 @@ Compiles `SOURCE` to SVG. The frontend is chosen by extension:
   listed with what to do about it in
   [Work out why a panel looks wrong](../howto/debug_a_layout.md#1-read-the-notes).
 
+`--watch`
+: Build once, then rebuild when the source, a file read during compilation, or a tracked
+  dependency directory changes. Changes are debounced until inputs have stayed still for
+  about 300 ms. Failed builds are reported and watching continues; the source and previously
+  observed dependencies stay watched so a deleted source or a partial failed build can recover.
+  Watch mode does not start a server or reload a browser. It polls with the standard library
+  by default; install `scenet[watch]` to use `watchfiles` when available. Ctrl-C exits with 0.
+
 ### Output naming
 
 A single-panel document writes to the requested name. A multi-panel document suffixes each
