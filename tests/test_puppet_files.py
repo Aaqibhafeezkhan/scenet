@@ -10,15 +10,18 @@ file, and otherwise where the document names it.
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pydantic
 import pytest
 
 from scenet import compile_file, compile_source, default_library
 from scenet.assets.contract import (
+    DEFAULT_POSE,
     PUPPET_RULE,
     PUPPET_SUFFIX,
     PuppetFileError,
+    PuppetLibrary,
     PuppetSpec,
     is_puppet_file,
     library_for,
@@ -28,6 +31,7 @@ from scenet.assets.contract import (
 from scenet.cli import main
 from scenet.diagnostics import RULES, Diagnostic, diagnose_file, diagnose_script, diagnose_source
 from scenet.errors import PanelSyntaxError
+from scenet.ir import CastMember
 from scenet.paths import NamedFileError, track_dependencies
 from scenet.pipeline import compile_script
 from scenet.safe_yaml import load
@@ -179,6 +183,38 @@ class TestTheLibrary:
     def test_a_cast_of_names_is_drawn_from_the_library_as_it_is(self):
         library = default_library()
         assert library_for({"a": "alice"}, None, library) is library
+
+    @pytest.mark.parametrize(
+        ("check", "text"),
+        [
+            (
+                diagnose_source,
+                "cast: {a: {reference: alice}}\npanels:\n  one: {}\n  two: {}\n  three: {}\n",
+            ),
+            (
+                diagnose_script,
+                "---\ncast: {A: {reference: alice}}\n---\n\nPANEL 1\n\nA\nOne.\n"
+                "\nPANEL 2\n\nA\nTwo.\n",
+            ),
+        ],
+    )
+    def test_a_check_reads_the_shipped_library_once(
+        self, check: Any, text: str, monkeypatch: pytest.MonkeyPatch
+    ):
+        """As the reference says: once per document, not once per panel it checks."""
+        reads: list[Path] = []
+        original = PuppetLibrary.from_directory.__func__
+
+        def counted(cls: type[PuppetLibrary], directory: Path) -> PuppetLibrary:
+            reads.append(directory)
+            return original(cls, directory)
+
+        monkeypatch.setattr(PuppetLibrary, "from_directory", classmethod(counted))
+        assert check(text) == []
+        assert len(reads) == 1
+
+    def test_the_pose_a_puppet_must_declare_is_the_one_a_member_defaults_to(self):
+        assert CastMember.model_fields["pose"].default == DEFAULT_POSE
 
     def test_a_file_reads_as_load_puppet_reads_it(self, tmp_path: Path):
         (tmp_path / "kid.puppet.yaml").write_text(KID, encoding="utf-8")
@@ -416,6 +452,9 @@ SLIPS = [
         "ofset",
     ),
     ("units_per_head: 100", "units_per_head: .inf", ("units_per_head",), "units_per_head: .inf"),
+    # What a cast member gets when it names no pose: without it, every such member was
+    # `unknown-pose`, each on its own line, and nothing said the puppet was at fault.
+    ("  standing_neutral: {elbow_l: -5, elbow_r: 5}\n", "", ("poses",), "poses:"),
 ]
 
 
