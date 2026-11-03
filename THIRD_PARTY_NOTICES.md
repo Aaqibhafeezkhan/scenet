@@ -78,6 +78,12 @@ the HTTP stack it brings: `starlette`, `uvicorn`, `sse-starlette`, `httpx2`, `ht
 (Apache-2.0), `cryptography` (Apache-2.0 OR BSD-3-Clause) and `cffi` (MIT-0), among smaller
 support packages. None of it is installed without the extra. The CI gate checks this tree too.
 
+### The optional `watch` extra
+
+`pip install 'scenet[watch]'` adds filesystem event monitoring via `watchfiles` (MIT License)
+and what it brings in: `anyio` (MIT) and its support package `idna` (BSD-3-Clause). None of it is
+installed without the extra. The CI gate checks this tree too.
+
 ## Prior art used as reference, not as code
 
 ### Comic Chat (Microsoft Research, 1996)
