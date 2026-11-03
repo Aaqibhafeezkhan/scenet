@@ -1,9 +1,9 @@
 """Compare ReportLab and a dependency-free PDF writer on one print fixture.
 
 Run:
-    python tools/pdf_print_spike.py direct --output /tmp/scenet-direct.pdf
+    python scripts/pdf_print_spike.py direct --output /tmp/scenet-direct.pdf
     pip install reportlab
-    python tools/pdf_print_spike.py reportlab --output /tmp/scenet-reportlab.pdf
+    python scripts/pdf_print_spike.py reportlab --output /tmp/scenet-reportlab.pdf
 
 This is deliberately a one-panel print-prepress spike, not the production emitter.
 The same resolved fixture is used by both backends so geometry and ink intent can

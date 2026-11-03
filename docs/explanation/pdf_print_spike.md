@@ -35,7 +35,7 @@ Target a constrained PDF suitable for print first, but do not label output PDF/X
 
 ## Runnable prototype and findings
 
-`tools/pdf_print_spike.py` emits the same one-page fixture with a dependency-free PDF writer
+`scripts/pdf_print_spike.py` emits the same one-page fixture with a dependency-free PDF writer
 or ReportLab. It records the byte count, SHA-256, and structural checks. Run each backend
 twice and compare hashes; inspect page boxes and the content stream with a PDF inspector.
 ReportLab is an optional install for the spike only, not a base dependency.
