@@ -18,7 +18,7 @@ from pypdf import PdfReader
 from pypdf.generic import BooleanObject, ContentStream, DictionaryObject
 
 from scenet.core import PanelCore
-from scenet.emit.marks import Mark, Paint, Role, marks
+from scenet.emit.marks import Mark, Paint, Picture, Role, marks
 from scenet.emit.pdf import (
     POINTS_PER_UNIT,
     RICH_BLACK,
@@ -51,15 +51,8 @@ def _cores(book: Book) -> dict[str, PanelCore]:
     return {name: result.core for name, result in book.panels.items()}
 
 
-def _drawn_over_a_picture(book: Book) -> bool:
-    return any(
-        core.backdrop is not None and core.backdrop.image is not None
-        for core in _cores(book).values()
-    )
-
-
 def _pdf(book: Book) -> bytes:
-    return render_pdf(book.pages, _cores(book), fonts=book.fonts)
+    return render_pdf(book.pages, _cores(book), fonts=book.fonts, images=book.images)
 
 
 def _blocks(lines: list[str]) -> list[list[str]]:
@@ -79,6 +72,8 @@ def _blocks(lines: list[str]) -> list[list[str]]:
 
 
 def _expected(mark: Mark) -> tuple[str, ...]:
+    if isinstance(mark.shape, Picture):
+        return ()
     if mark.fill is not None and mark.stroke is not None:
         return PAINTING["Sf" if mark.stroke_first else "B"]
     return PAINTING["f" if mark.fill is not None else "S"]
@@ -155,10 +150,6 @@ class TestFile:
         assert b"/Direction /R2L" in _pdf(_book("36-right-to-left.scene.yaml"))
         assert b"/Direction" not in _pdf(_book("24-page.scene.yaml"))
 
-    def test_a_supplied_picture_is_refused_for_now(self):
-        with pytest.raises(ValueError, match="supplied pictures"):
-            _pdf(_book("34-supplied-art.scene.yaml"))
-
 
 class TestTheBlackPlate:
     def _states(self, data: bytes) -> dict[str, dict[str, object]]:
@@ -207,8 +198,6 @@ class TestTheBlackPlate:
 @pytest.mark.parametrize("name", IDS)
 def test_every_mark_is_one_block_painted_as_it_should_be(name: str):
     book = _book(name)
-    if _drawn_over_a_picture(book):
-        return  # pictures arrive with the next step of #80
     for core in _cores(book).values():
         family = typeface_of(core, fonts=book.fonts)
         drawn = [mark for mark in marks(core, family) if not mark.is_veil]
@@ -217,14 +206,12 @@ def test_every_mark_is_one_block_painted_as_it_should_be(name: str):
 
 
 @pytest.mark.parametrize("name", IDS)
-def test_every_picture_free_example_prints_the_same_twice_and_in_its_greys(name: str):
+def test_every_example_prints_the_same_twice_and_in_its_greys(name: str):
     book = _book(name)
-    if _drawn_over_a_picture(book):
-        return
     data = _pdf(book)
     assert data == _pdf(_book(name))
     mono = {key: core.as_mono() for key, core in _cores(book).items()}
-    assert data == render_pdf(book.pages, mono, fonts=book.fonts)
+    assert data == render_pdf(book.pages, mono, fonts=book.fonts, images=book.images)
     reader = PdfReader(io.BytesIO(data))
     for page in reader.pages:
         assert ContentStream(page.get_contents(), reader).operations
