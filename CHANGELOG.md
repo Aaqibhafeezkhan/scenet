@@ -167,6 +167,9 @@ below 1.0 means.
 
 ### Fixed
 
+- **A right-to-left document without pages prints right to left** (#296). Its print PDF, one
+  page per panel, did not say `/Direction /R2L`, which only pages read right to left wrote, so
+  a reader laid it out left to right.
 - **The playground's print PDF is the one `scenet build --pdf` writes** (#294). It carried the
   picture of a panel no page places, which nothing draws, and refused the whole document when
   that picture was one print cannot carry, such as a lossless JPEG. `render_pdf` now takes only
