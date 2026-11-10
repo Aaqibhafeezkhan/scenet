@@ -88,6 +88,7 @@ from scenet.spec_pack import part
 
 __all__ = [
     "CompileReport",
+    "CompiledPage",
     "CompiledPanel",
     "Finding",
     "Puppet",
@@ -194,8 +195,8 @@ class Finding(BaseModel):
     where: str = Field(description="Path to the offending value, such as `script.0.say.by`")
     line: int = Field(description="1-based line the finding starts on")
     column: int = Field(description="1-based column the finding starts at")
-    end_line: int
-    end_column: int
+    end_line: int = Field(description="1-based line the finding ends on")
+    end_column: int = Field(description="1-based column the finding ends before")
 
 
 class ValidationReport(BaseModel):
@@ -254,7 +255,7 @@ class Puppet(BaseModel):
 class PuppetCatalogue(BaseModel):
     """The puppet library."""
 
-    puppets: list[Puppet]
+    puppets: list[Puppet] = Field(description="Every puppet the library holds, by name")
 
 
 def get_spec(
