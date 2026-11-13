@@ -181,7 +181,18 @@ def test_the_mutation_run_installs_what_the_tests_import():
     documentation's configuration, which needs `docs`, so the clean run failed and no
     mutant was tried: run 39116267418. CI's test jobs sync every group; so must this.
     """
-    job = _load("mutation.yml")["jobs"]["mutmut"]
+    for name in ("mutmut", "mutmut-clean"):
+        job = _load("ci.yml" if name == "mutmut-clean" else "mutation.yml")["jobs"][name]
+        syncs = [line for line in _script(job).splitlines() if "uv sync" in line]
+        assert syncs, name
+        assert all("--all-groups" in line for line in syncs), syncs
+
+
+def test_the_exploration_installs_what_the_conftest_imports():
+    """The root `conftest.py` loads the documentation's example parsers, which import
+    `markdown_it` from the `docs` group. The exploring job synced the default groups
+    alone, so it failed to load the conftest and explored nothing (#345)."""
+    job = _load("mutation.yml")["jobs"]["explore"]
     syncs = [line for line in _script(job).splitlines() if "uv sync" in line]
     assert syncs
     assert all("--all-groups" in line for line in syncs), syncs
@@ -516,3 +527,38 @@ def test_every_linux_job_runs_on_the_one_pinned_image():
         for path in WORKFLOWS.glob("*.yml")
     }
     assert {name: images for name, images in runners.items() if images - {UBUNTU}} == {}
+
+
+class TestThePullRequestRunsOneLeg:
+    """A pull request that changes the mutation workflow runs it, to see it work (#345).
+
+    Every leg would hold the runners for hours, again on every push. One leg, with a
+    threshold, goes through every step a scheduled leg does.
+    """
+
+    def test_its_plan_names_one_leg_on_a_pull_request(self):
+        (step,) = [
+            step
+            for step in _load("mutation.yml")["jobs"]["legs"]["steps"]
+            if step.get("id") == "plan"
+        ]
+        assert step["env"]["LEGS"] == (
+            "${{ github.event_name == 'pull_request' && 'emit/other' || inputs.legs }}"
+        )
+
+    def test_a_new_push_replaces_the_last_run(self):
+        concurrency = _load("mutation.yml")["concurrency"]
+        assert concurrency["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
+
+
+def test_a_leg_runs_from_nothing():
+    """mutmut re-tests only functions whose code changed, so a kept `mutants/` keeps a
+    survivor a new test now kills, and the weekly list drifts from the truth (#345)."""
+    job = _load("mutation.yml")["jobs"]["mutmut"]
+    cached = [
+        step
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("actions/cache@")
+        and "mutants" in str(step.get("with", {}).get("path", ""))
+    ]
+    assert cached == []
