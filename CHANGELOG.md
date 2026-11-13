@@ -10,6 +10,15 @@ below 1.0 means.
 
 ## [Unreleased]
 
+### Added
+
+- **A failed scheduled run opens an issue** (#346). The mutation run, CodeQL and the link check
+  each end in a job that calls `.github/workflows/scheduled-report.yml`: a failure opens an issue
+  titled `Scheduled run failed: <workflow>`, a further one comments on it, and the next success
+  closes it. It holds `issues: write` alone, and is shell over the `gh` CLI with no action. A
+  test lists every workflow with a `schedule:` trigger and fails if one does not end in it; the
+  link check can be dispatched with `force-failure` and `report` to watch it work.
+
 ### Fixed
 
 - **The weekly mutation run finishes again, and covers the front ends and the core** (#345). It
@@ -24,6 +33,11 @@ below 1.0 means.
   between two of its joints, and balloon placement made a polygon of it, which ended `scenet
   build` and `scenet check --deep` in a `ValueError` rather than a finding. Lettering now sees
   its face alone, as it does a figure's that declares only a face.
+- **The weekly link check passes again** (#346), red since 2026-08-31. The Skia source the
+  `feTurbulence` notes cite moved to `SkPerlinNoiseShaderImpl.h`, now linked at a commit rather
+  than a branch. The playground's state after the `#` is no longer checked as an anchor, and the
+  hosts that answer every automated client with an error (the ACM Digital Library and its DOIs,
+  ScienceDirect, PubMed Central, GNOME's GitLab, BlankComic) are skipped, by host, each with the reason.
 
 ## [0.13.0] - 2026-11-12
 
