@@ -1312,10 +1312,10 @@
         "font"
       ],
       "region": [
+        5,
         1,
-        1,
-        1,
-        2
+        5,
+        38
       ],
       "rule": "font-file",
       "source": "tests/finding_corpus/a-font-a-script-panel-names.script"
@@ -1332,10 +1332,10 @@
         "font"
       ],
       "region": [
+        5,
         1,
-        1,
-        1,
-        2
+        5,
+        38
       ],
       "rule": "font-file",
       "source": "tests/finding_corpus/a-font-a-script-panel-names.script"
